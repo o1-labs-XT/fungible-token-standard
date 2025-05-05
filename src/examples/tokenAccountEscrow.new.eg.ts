@@ -69,7 +69,6 @@ export class TokenAccountEscrow extends SmartContract {
     senderTokenAccount.body.useFullCommitment = Bool(true);
     senderTokenAccount.update.appState[0].isSome = Bool(true);
     senderTokenAccount.update.appState[0].value = amount.value;
-    this.sender.getAndRequireSignature;
 
     await token.transferCustom(
       sender,
@@ -86,7 +85,7 @@ export class TokenAccountEscrow extends SmartContract {
     const tokenId = token.deriveTokenId();
 
     const sender = this.sender.getUnconstrained();
-    const userTokenAccount = AccountUpdate.create(sender, tokenId);
+    const userTokenAccount = AccountUpdate.createSigned(sender, tokenId);
     userTokenAccount.body.useFullCommitment = Bool(true);
     const currentBalance = userTokenAccount.update.appState[0].value;
     currentBalance.assertGreaterThanOrEqual(
@@ -338,5 +337,5 @@ ownerWithdrawTx.prove();
 ownerWithdrawTx.sign([owner.key]);
 const ownerWithdrawTxResult = await ownerWithdrawTx.safeSend();
 console.log("Owner Withdraw tx status:", ownerWithdrawTxResult.status);
-//console.log(ownerWithdrawTxResult.toPretty());
-//equal(ownerWithdrawTxResult.status, 'rejected')
+console.log(ownerWithdrawTxResult.toPretty());
+equal(ownerWithdrawTxResult.status, 'rejected')
