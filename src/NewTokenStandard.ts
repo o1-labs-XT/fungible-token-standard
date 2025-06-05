@@ -516,6 +516,26 @@ class FungibleToken extends TokenContract {
     return this.decimals.getAndRequireEquals();
   }
 
+  /**
+   * Retrieves all current token configurations in packed form.
+   * Caller can unpack off-chain using respective unpack methods.
+   * @returns Field array: [packedAmountConfigs, packedMintParams, packedBurnParams, packedDynamicProofConfigs]
+   */
+  async getAllConfigs(): Promise<Field[]> {
+    const packedAmountConfigs = this.packedAmountConfigs.getAndRequireEquals();
+    const packedMintParams = this.packedMintParams.getAndRequireEquals();
+    const packedBurnParams = this.packedBurnParams.getAndRequireEquals();
+    const packedDynamicProofConfigs =
+      this.packedDynamicProofConfigs.getAndRequireEquals();
+
+    return [
+      packedAmountConfigs,
+      packedMintParams,
+      packedBurnParams,
+      packedDynamicProofConfigs,
+    ];
+  }
+
   @method
   async updateMintConfig(mintConfig: MintConfig) {
     //! maybe enforce that sender is admin instead of approving with an admin signature

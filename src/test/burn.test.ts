@@ -520,6 +520,41 @@ describe('New Token Standard Burn Tests', () => {
       await tx.sign([deployer.key, tokenA.key]).send();
     });
 
+    it('should return all configs after initialization', async () => {
+      const configs = await tokenContract.getAllConfigs();
+
+      expect(configs).toHaveLength(4);
+      expect(configs[0]).toBeInstanceOf(Field);
+      expect(configs[1]).toBeInstanceOf(Field);
+      expect(configs[2]).toBeInstanceOf(Field);
+      expect(configs[3]).toBeInstanceOf(Field);
+
+      const [
+        packedAmountConfigs,
+        packedMintParams,
+        packedBurnParams,
+        packedDynamicProofConfigs,
+      ] = configs;
+
+      const mintConfig = MintConfig.unpack(packedAmountConfigs);
+      const burnConfig = BurnConfig.unpack(packedAmountConfigs);
+      const unpackedMintParams = MintParams.unpack(packedMintParams);
+      const unpackedBurnParams = BurnParams.unpack(packedBurnParams);
+
+      expect(mintConfig.unauthorized).toEqual(Bool(false));
+      expect(mintConfig.fixedAmount).toEqual(Bool(false));
+      expect(mintConfig.rangedAmount).toEqual(Bool(true));
+
+      expect(burnConfig.unauthorized).toEqual(Bool(true));
+      expect(burnConfig.fixedAmount).toEqual(Bool(false));
+      expect(burnConfig.rangedAmount).toEqual(Bool(true));
+
+      expect(unpackedMintParams.minAmount).toEqual(mintParams.minAmount);
+      expect(unpackedMintParams.maxAmount).toEqual(mintParams.maxAmount);
+      expect(unpackedBurnParams.minAmount).toEqual(burnParams.minAmount);
+      expect(unpackedBurnParams.maxAmount).toEqual(burnParams.maxAmount);
+    });
+
     it('should mint for user1 and user2', async () => {
       const mintAmount = UInt64.from(1000);
       const tx = await Mina.transaction({ sender: user1, fee }, async () => {
@@ -631,6 +666,33 @@ describe('New Token Standard Burn Tests', () => {
       });
 
       await updateBurnConfigTx(user2, burnConfig, [user2.key, tokenAdmin.key]);
+    });
+
+    it('should reflect burn config updates in getAllConfigs()', async () => {
+      const configsBefore = await tokenContract.getAllConfigs();
+
+      const newBurnConfig = new BurnConfig({
+        unauthorized: Bool(true),
+        fixedAmount: Bool(true),
+        rangedAmount: Bool(false),
+      });
+
+      await updateBurnConfigTx(user2, newBurnConfig, [
+        user2.key,
+        tokenAdmin.key,
+      ]);
+
+      const configsAfter = await tokenContract.getAllConfigs();
+
+      expect(configsAfter[0]).not.toEqual(configsBefore[0]); // packedAmountConfigs
+      expect(configsAfter[1]).toEqual(configsBefore[1]); // packedMintParams
+      expect(configsAfter[2]).toEqual(configsBefore[2]); // packedBurnParams
+      expect(configsAfter[3]).toEqual(configsBefore[3]); // packedDynamicProofConfigs
+
+      const updatedBurnConfig = BurnConfig.unpack(configsAfter[0]);
+      expect(updatedBurnConfig.unauthorized).toEqual(Bool(true));
+      expect(updatedBurnConfig.fixedAmount).toEqual(Bool(true));
+      expect(updatedBurnConfig.rangedAmount).toEqual(Bool(false));
     });
 
     it('should update burn fixedAmount config via field-specific function', async () => {
@@ -818,7 +880,39 @@ describe('New Token Standard Burn Tests', () => {
       await updateBurnParamsTx(user1, burnParams, [user1.key, tokenAdmin.key]);
     });
 
+    it('should reflect burn params updates in getAllConfigs()', async () => {
+      const configsBefore = await tokenContract.getAllConfigs();
+
+      const newBurnParams = new BurnParams({
+        fixedAmount: UInt64.from(300),
+        minAmount: UInt64.from(100),
+        maxAmount: UInt64.from(800),
+      });
+
+      await updateBurnParamsTx(user1, newBurnParams, [
+        user1.key,
+        tokenAdmin.key,
+      ]);
+
+      const configsAfter = await tokenContract.getAllConfigs();
+      expect(configsAfter[0]).toEqual(configsBefore[0]); // packedAmountConfigs
+      expect(configsAfter[1]).toEqual(configsBefore[1]); // packedMintParams
+      expect(configsAfter[2]).not.toEqual(configsBefore[2]); // packedBurnParams
+      expect(configsAfter[3]).toEqual(configsBefore[3]); // packedDynamicProofConfigs
+
+      const updatedBurnParams = BurnParams.unpack(configsAfter[2]);
+      expect(updatedBurnParams.fixedAmount).toEqual(newBurnParams.fixedAmount);
+      expect(updatedBurnParams.minAmount).toEqual(newBurnParams.minAmount);
+      expect(updatedBurnParams.maxAmount).toEqual(newBurnParams.maxAmount);
+    });
+
     it('should update burn fixed amount via field-specific function', async () => {
+      const paramsBeforeUpdate = BurnParams.unpack(
+        tokenContract.packedBurnParams.get()
+      );
+      const originalMinAmount = paramsBeforeUpdate.minAmount;
+      const originalMaxAmount = paramsBeforeUpdate.maxAmount;
+
       const newFixedAmount = UInt64.from(150);
       await updateBurnParamsPropertyTx(
         user1,
@@ -831,8 +925,8 @@ describe('New Token Standard Burn Tests', () => {
         tokenContract.packedBurnParams.get()
       );
       expect(paramsAfterUpdate.fixedAmount).toEqual(newFixedAmount);
-      expect(paramsAfterUpdate.minAmount).toEqual(burnParams.minAmount);
-      expect(paramsAfterUpdate.maxAmount).toEqual(burnParams.maxAmount);
+      expect(paramsAfterUpdate.minAmount).toEqual(originalMinAmount);
+      expect(paramsAfterUpdate.maxAmount).toEqual(originalMaxAmount);
     });
 
     it('should reject burn fixed amount update via field-specific function when unauthorized by the admin', async () => {

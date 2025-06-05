@@ -616,6 +616,41 @@ describe('New Token Standard Mint Tests', () => {
         "Cannot update field 'permissions' because permission for this field is 'Impossible'";
       await testInitializeTx([deployer.key, tokenA.key], expectedErrorMessage);
     });
+
+    it('should return all configs after initialization', async () => {
+      const configs = await tokenContract.getAllConfigs();
+
+      expect(configs).toHaveLength(4);
+      expect(configs[0]).toBeInstanceOf(Field);
+      expect(configs[1]).toBeInstanceOf(Field);
+      expect(configs[2]).toBeInstanceOf(Field);
+      expect(configs[3]).toBeInstanceOf(Field);
+
+      const [
+        packedAmountConfigs,
+        packedMintParams,
+        packedBurnParams,
+        packedDynamicProofConfigs,
+      ] = configs;
+
+      const mintConfig = MintConfig.unpack(packedAmountConfigs);
+      const burnConfig = BurnConfig.unpack(packedAmountConfigs);
+      const unpackedMintParams = MintParams.unpack(packedMintParams);
+      const unpackedBurnParams = BurnParams.unpack(packedBurnParams);
+
+      expect(mintConfig.unauthorized).toEqual(Bool(false));
+      expect(mintConfig.fixedAmount).toEqual(Bool(false));
+      expect(mintConfig.rangedAmount).toEqual(Bool(true));
+
+      expect(burnConfig.unauthorized).toEqual(Bool(true));
+      expect(burnConfig.fixedAmount).toEqual(Bool(false));
+      expect(burnConfig.rangedAmount).toEqual(Bool(true));
+
+      expect(unpackedMintParams.minAmount).toEqual(mintParams.minAmount);
+      expect(unpackedMintParams.maxAmount).toEqual(mintParams.maxAmount);
+      expect(unpackedBurnParams.minAmount).toEqual(burnParams.minAmount);
+      expect(unpackedBurnParams.maxAmount).toEqual(burnParams.maxAmount);
+    });
   });
 
   describe('Mint Config: Default: Authorized/Ranged', () => {
@@ -708,6 +743,34 @@ describe('New Token Standard Mint Tests', () => {
       });
 
       await updateMintConfigTx(user2, mintConfig, [user2.key, tokenAdmin.key]);
+    });
+
+    it('should reflect mint config updates in getAllConfigs()', async () => {
+      const configsBefore = await tokenContract.getAllConfigs();
+
+      // Update mint config to fixed amount
+      const newMintConfig = new MintConfig({
+        unauthorized: Bool(true),
+        fixedAmount: Bool(true),
+        rangedAmount: Bool(false),
+      });
+
+      await updateMintConfigTx(user2, newMintConfig, [
+        user2.key,
+        tokenAdmin.key,
+      ]);
+
+      const configsAfter = await tokenContract.getAllConfigs();
+
+      expect(configsAfter[0]).not.toEqual(configsBefore[0]); // packedAmountConfigs
+      expect(configsAfter[1]).toEqual(configsBefore[1]); // packedMintParams
+      expect(configsAfter[2]).toEqual(configsBefore[2]); // packedBurnParams
+      expect(configsAfter[3]).toEqual(configsBefore[3]); // packedDynamicProofConfigs
+
+      const updatedMintConfig = MintConfig.unpack(configsAfter[0]);
+      expect(updatedMintConfig.unauthorized).toEqual(Bool(true));
+      expect(updatedMintConfig.fixedAmount).toEqual(Bool(true));
+      expect(updatedMintConfig.rangedAmount).toEqual(Bool(false));
     });
 
     it('should update fixedAmount config via field-specific function', async () => {
@@ -895,7 +958,40 @@ describe('New Token Standard Mint Tests', () => {
       await updateMintParamsTx(user1, mintParams, [user1.key, tokenAdmin.key]);
     });
 
+    it('should reflect mint params updates in getAllConfigs()', async () => {
+      const configsBefore = await tokenContract.getAllConfigs();
+
+      const newMintParams = new MintParams({
+        fixedAmount: UInt64.from(500),
+        minAmount: UInt64.from(200),
+        maxAmount: UInt64.from(1500),
+      });
+
+      await updateMintParamsTx(user1, newMintParams, [
+        user1.key,
+        tokenAdmin.key,
+      ]);
+
+      const configsAfter = await tokenContract.getAllConfigs();
+
+      expect(configsAfter[0]).toEqual(configsBefore[0]); // packedAmountConfigs
+      expect(configsAfter[1]).not.toEqual(configsBefore[1]); // packedMintParams
+      expect(configsAfter[2]).toEqual(configsBefore[2]); // packedBurnParams
+      expect(configsAfter[3]).toEqual(configsBefore[3]); // packedDynamicProofConfigs
+
+      const updatedMintParams = MintParams.unpack(configsAfter[1]);
+      expect(updatedMintParams.fixedAmount).toEqual(UInt64.from(500));
+      expect(updatedMintParams.minAmount).toEqual(UInt64.from(200));
+      expect(updatedMintParams.maxAmount).toEqual(UInt64.from(1500));
+    });
+
     it('should update mint fixed amount via field-specific function', async () => {
+      const paramsBeforeUpdate = MintParams.unpack(
+        tokenContract.packedMintParams.get()
+      );
+      const originalMinAmount = paramsBeforeUpdate.minAmount;
+      const originalMaxAmount = paramsBeforeUpdate.maxAmount;
+
       const newFixedAmount = UInt64.from(600);
       await updateMintParamsPropertyTx(
         user1,
@@ -908,8 +1004,8 @@ describe('New Token Standard Mint Tests', () => {
         tokenContract.packedMintParams.get()
       );
       expect(paramsAfterUpdate.fixedAmount).toEqual(newFixedAmount);
-      expect(paramsAfterUpdate.minAmount).toEqual(mintParams.minAmount);
-      expect(paramsAfterUpdate.maxAmount).toEqual(mintParams.maxAmount);
+      expect(paramsAfterUpdate.minAmount).toEqual(originalMinAmount);
+      expect(paramsAfterUpdate.maxAmount).toEqual(originalMaxAmount);
     });
 
     it('should reject mint fixed amount update via field-specific function when unauthorized by the admin', async () => {
