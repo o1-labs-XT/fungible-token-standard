@@ -22,7 +22,7 @@ import {
   PrivateKey,
   UInt8,
 } from 'o1js';
-import { FungibleToken, VKeyMerkleMap } from '../NewTokenStandard.js';
+import { FungibleToken, VKeyMerkleMap } from '../FungibleTokenStandard.js';
 import {
   generateDummyDynamicProof,
   SideloadedProof,

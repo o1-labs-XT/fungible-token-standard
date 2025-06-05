@@ -20,6 +20,6 @@ export {
     BalanceChangeEvent,
     SideLoadedVKeyUpdateEvent,
     VKeyMerkleMap,
-} from './NewTokenStandard.js'
+} from './FungibleTokenStandard.js'
 
 export { generateDummyDynamicProof, SideloadedProof } from './side-loaded/program.eg.js';

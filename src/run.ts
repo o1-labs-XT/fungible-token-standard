@@ -1,6 +1,6 @@
 import { equal } from 'node:assert';
 import { AccountUpdate, Bool, Mina, PrivateKey, UInt64, UInt8 } from 'o1js';
-import { FungibleToken, VKeyMerkleMap } from './NewTokenStandard.js';
+import { FungibleToken, VKeyMerkleMap } from './FungibleTokenStandard.js';
 import {
   MintConfig,
   MintParams,

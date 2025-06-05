@@ -7,7 +7,7 @@ import {
   UInt8,
   VerificationKey,
 } from 'o1js';
-import { FungibleToken, VKeyMerkleMap } from '../NewTokenStandard.js';
+import { FungibleToken, VKeyMerkleMap } from '../FungibleTokenStandard.js';
 import {
   MintConfig,
   MintParams,

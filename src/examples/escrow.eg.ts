@@ -29,7 +29,7 @@ import {
   generateDummyDynamicProof,
   SideloadedProof,
 } from '../side-loaded/program.eg.js';
-import { FungibleToken, VKeyMerkleMap } from '../NewTokenStandard.js';
+import { FungibleToken, VKeyMerkleMap } from '../FungibleTokenStandard.js';
 
 export class TokenEscrow extends SmartContract {
   @state(PublicKey)

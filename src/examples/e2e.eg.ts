@@ -1,5 +1,5 @@
 import { AccountUpdate, Mina, PrivateKey, UInt8, UInt64 } from 'o1js';
-import { FungibleToken, VKeyMerkleMap } from '../NewTokenStandard.js';
+import { FungibleToken, VKeyMerkleMap } from '../FungibleTokenStandard.js';
 import { VerificationKey } from 'o1js';
 import {
   generateDummyDynamicProof,
