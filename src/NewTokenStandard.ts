@@ -620,14 +620,27 @@ class FungibleToken extends TokenContract {
     return Bool(true);
   }
 
-  private async canMint(accountUpdate: AccountUpdate, mintParams: MintParams) {
-    const packedConfigs = this.packedAmountConfigs.getAndRequireEquals();
-    const mintConfig = MintConfig.unpack(packedConfigs);
+  /**
+   * Checks if admin signature is required and ensures it's provided when needed.
+   * @param config - The configuration containing unauthorized flag
+   */
+  private async requiresAdminSignature(config: { unauthorized: Bool }) {
+    await this.ensureAdminSignature(config.unauthorized.not());
+  }
 
-    const { fixedAmount, minAmount, maxAmount } = mintParams;
-
-    await this.ensureAdminSignature(mintConfig.unauthorized.not());
-
+  /**
+   * Validates that the balance change amount meets the configured constraints.
+   * @param accountUpdate - The account update to validate
+   * @param params - The parameters containing fixedAmount, minAmount, maxAmount
+   * @param config - The configuration containing fixedAmount, rangedAmount flags
+   * @returns Boolean indicating if the amount is valid
+   */
+  private isValidBalanceChange(
+    accountUpdate: AccountUpdate,
+    params: { fixedAmount: UInt64; minAmount: UInt64; maxAmount: UInt64 },
+    config: { fixedAmount: Bool; rangedAmount: Bool }
+  ): Bool {
+    const { fixedAmount, minAmount, maxAmount } = params;
     const magnitude = accountUpdate.body.balanceChange.magnitude;
 
     const isFixed = magnitude.equals(fixedAmount);
@@ -636,38 +649,29 @@ class FungibleToken extends TokenContract {
     const upperBound = magnitude.lessThanOrEqual(maxAmount);
     const isInRange = lowerBound.and(upperBound);
 
-    const canMint = Provable.switch(
-      [mintConfig.fixedAmount, mintConfig.rangedAmount],
+    const canPerform = Provable.switch(
+      [config.fixedAmount, config.rangedAmount],
       Bool,
       [isFixed, isInRange]
     );
 
-    return canMint;
+    return canPerform;
+  }
+
+  private async canMint(accountUpdate: AccountUpdate, mintParams: MintParams) {
+    const packedConfigs = this.packedAmountConfigs.getAndRequireEquals();
+    const mintConfig = MintConfig.unpack(packedConfigs);
+
+    await this.requiresAdminSignature(mintConfig);
+    return this.isValidBalanceChange(accountUpdate, mintParams, mintConfig);
   }
 
   private async canBurn(accountUpdate: AccountUpdate, burnParams: BurnParams) {
     const packedConfigs = this.packedAmountConfigs.getAndRequireEquals();
     const burnConfig = BurnConfig.unpack(packedConfigs);
 
-    const { fixedAmount, minAmount, maxAmount } = burnParams;
-
-    await this.ensureAdminSignature(burnConfig.unauthorized.not());
-
-    const magnitude = accountUpdate.body.balanceChange.magnitude;
-
-    const isFixed = magnitude.equals(fixedAmount);
-
-    const lowerBound = magnitude.greaterThanOrEqual(minAmount);
-    const upperBound = magnitude.lessThanOrEqual(maxAmount);
-    const isInRange = lowerBound.and(upperBound);
-
-    const canBurn = Provable.switch(
-      [burnConfig.fixedAmount, burnConfig.rangedAmount],
-      Bool,
-      [isFixed, isInRange]
-    );
-
-    return canBurn;
+    await this.requiresAdminSignature(burnConfig);
+    return this.isValidBalanceChange(accountUpdate, burnParams, burnConfig);
   }
 
   private async verifySideLoadedProof(
