@@ -39,6 +39,7 @@ import {
   PublicInputs,
   PublicOutputs,
 } from '../side-loaded/program.eg.js';
+import { TEST_ERROR_MESSAGES } from './constants.js';
 
 const proofsEnabled = false;
 
@@ -588,7 +589,7 @@ describe('New Token Standard ApproveBase Tests', () => {
     });
 
     it('should reject updating side-loaded vKey hash: invalid operationKey', async () => {
-      const expectedErrorMessage = 'Please enter a valid operation key!';
+      const expectedErrorMessage = FungibleTokenErrors.invalidOperationKey;
       await updateSLVkeyHashTx(
         user1,
         programVkey,
@@ -603,8 +604,7 @@ describe('New Token Standard ApproveBase Tests', () => {
       let tamperedVKeyMap = vKeyMap.clone();
       tamperedVKeyMap.insert(14n, Field.random());
 
-      const expectedErrorMessage =
-        'Off-chain side-loaded vKey Merkle Map is out of sync!';
+      const expectedErrorMessage = FungibleTokenErrors.vKeyMapOutOfSync;
       await updateSLVkeyHashTx(
         user1,
         programVkey,
@@ -616,8 +616,7 @@ describe('New Token Standard ApproveBase Tests', () => {
     });
 
     it('should reject approveBase if vKeyHash was never updated', async () => {
-      const expectedErrorMessage =
-        'Verification key hash is missing for this operation. Please make sure to register it before verifying a side-loaded proof when `shouldVerify` is enabled in the config.';
+      const expectedErrorMessage = FungibleTokenErrors.missingVKeyForOperation;
 
       await testApproveBaseSLTx(
         user2,
@@ -631,10 +630,13 @@ describe('New Token Standard ApproveBase Tests', () => {
     });
 
     it('should update the side-loaded vKey hash for updates', async () => {
-      await updateSLVkeyHashTx(user1, programVkey, vKeyMap, OperationKeys.ApproveBase, [
-        user1.key,
-        tokenAdmin.key,
-      ]);
+      await updateSLVkeyHashTx(
+        user1,
+        programVkey,
+        vKeyMap,
+        OperationKeys.ApproveBase,
+        [user1.key, tokenAdmin.key]
+      );
       vKeyMap.set(OperationKeys.ApproveBase, programVkey.hash);
       expect(tokenContract.vKeyMapRoot.get()).toEqual(vKeyMap.root);
     });
@@ -645,8 +647,7 @@ describe('New Token Standard ApproveBase Tests', () => {
       let tamperedVKeyMap = vKeyMap.clone();
       tamperedVKeyMap.insert(8n, Field.random());
 
-      const expectedErrorMessage =
-        'Off-chain side-loaded vKey Merkle Map is out of sync!';
+      const expectedErrorMessage = FungibleTokenErrors.vKeyMapOutOfSync;
 
       await testApproveBaseSLTx(
         user2,
@@ -660,7 +661,7 @@ describe('New Token Standard ApproveBase Tests', () => {
     });
 
     it('should reject approveBase given a non-compliant vKey hash', async () => {
-      const expectedErrorMessage = 'Invalid side-loaded verification key!';
+      const expectedErrorMessage = FungibleTokenErrors.invalidSideLoadedVKey;
       await testApproveBaseSLTx(
         user2,
         user1,
@@ -682,7 +683,7 @@ describe('New Token Standard ApproveBase Tests', () => {
           user1
         );
 
-        const expectedErrorMessage = 'Constraint unsatisfied (unreduced)';
+        const expectedErrorMessage = TEST_ERROR_MESSAGES.CONSTRAINT_UNSATISFIED;
         await testApproveBaseSLTx(
           user1,
           deployer,
@@ -712,16 +713,19 @@ describe('New Token Standard ApproveBase Tests', () => {
     });
 
     it('should update the side-loaded vKey hash for updates to pause the method', async () => {
-      await updateSLVkeyHashTx(user1, pausedVkey, vKeyMap, OperationKeys.ApproveBase, [
-        user1.key,
-        tokenAdmin.key,
-      ]);
+      await updateSLVkeyHashTx(
+        user1,
+        pausedVkey,
+        vKeyMap,
+        OperationKeys.ApproveBase,
+        [user1.key, tokenAdmin.key]
+      );
       vKeyMap.set(OperationKeys.ApproveBase, pausedVkey.hash);
       expect(tokenContract.vKeyMapRoot.get()).toEqual(vKeyMap.root);
     });
 
     it('should reject generating a paused proof as the constraint is always unsatisfied', async () => {
-      const expectedErrorMessage = 'The `approveCustom` method is paused!';
+      const expectedErrorMessage = TEST_ERROR_MESSAGES.PAUSED_METHOD;
       try {
         const pausedProof = await generatePauseProof(
           tokenContract.deriveTokenId(),

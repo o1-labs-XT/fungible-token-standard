@@ -10,7 +10,27 @@ export {
   BurnDynamicProofConfig,
   TransferDynamicProofConfig,
   UpdatesDynamicProofConfig,
-  OperationKeys
+  OperationKeys,
+  ConfigErrors,
+};
+
+/**
+ * Configuration validation error messages
+ * These are used by the config classes for validation logic
+ */
+const ConfigErrors = {
+  invalidConfigValidation:
+    'Exactly one of the fixed or ranged amount options must be enabled',
+  invalidAmountRange:
+    'Invalid configuration: Minimum amount must be less than maximum amount',
+  invalidAmountConfigCount:
+    'Invalid configuration: Expected exactly 2 amount configurations (mint, burn)',
+  invalidDynamicProofConfigCount:
+    'Invalid configuration: Expected exactly 4 dynamic proof configurations',
+  invalidMintConfigData:
+    'Invalid mint configuration: Missing or conflicting amount parameters',
+  invalidBurnConfigData:
+    'Invalid burn configuration: Missing or conflicting amount parameters',
 };
 
 /**
@@ -64,10 +84,7 @@ class AmountConfig extends Struct({
     this.fixedAmount
       .toField()
       .add(this.rangedAmount.toField())
-      .assertEquals(
-        1,
-        'Exactly one of the fixed or ranged amount options must be enabled!'
-      );
+      .assertEquals(1, ConfigErrors.invalidConfigValidation);
   }
 
   /**
@@ -80,7 +97,7 @@ class AmountConfig extends Struct({
    */
   static packConfigs(configs: [AmountConfig, AmountConfig]): Field {
     if (configs.length !== 2)
-      throw new Error('Expected exactly two configs: [mint, burn]');
+      throw new Error(ConfigErrors.invalidAmountConfigCount);
     return Field.fromBits([...configs[0].toBits(), ...configs[1].toBits()]);
   }
 }
@@ -283,7 +300,10 @@ class AmountParams extends Struct({
    * @throws If `minAmount` is not less than `maxAmount`.
    */
   validate() {
-    this.minAmount.assertLessThan(this.maxAmount, 'Invalid amount range!');
+    this.minAmount.assertLessThan(
+      this.maxAmount,
+      ConfigErrors.invalidAmountRange
+    );
   }
 }
 
@@ -325,14 +345,10 @@ class MintParams extends AmountParams {
 
     if (config.fixedAmount.toBoolean()) {
       if (data.fixedAmount === undefined) {
-        throw new Error(
-          'MintConfig requires a fixed amount, but no `fixedAmount` was provided in params data.'
-        );
+        throw new Error(ConfigErrors.invalidMintConfigData);
       }
       if (data.minAmount !== undefined || data.maxAmount !== undefined) {
-        throw new Error(
-          'MintConfig requires a fixed amount; `minAmount` and `maxAmount` should not be provided in params data.'
-        );
+        throw new Error(ConfigErrors.invalidMintConfigData);
       }
       initData = {
         fixedAmount: data.fixedAmount,
@@ -341,14 +357,10 @@ class MintParams extends AmountParams {
       };
     } else {
       if (data.minAmount === undefined || data.maxAmount === undefined) {
-        throw new Error(
-          'MintConfig requires a ranged amount, but `minAmount` or `maxAmount` was not provided in params data.'
-        );
+        throw new Error(ConfigErrors.invalidMintConfigData);
       }
       if (data.fixedAmount !== undefined) {
-        throw new Error(
-          'MintConfig requires a ranged amount; `fixedAmount` should not be provided in params data.'
-        );
+        throw new Error(ConfigErrors.invalidMintConfigData);
       }
       initData = {
         fixedAmount: UInt64.from(0),
@@ -357,7 +369,7 @@ class MintParams extends AmountParams {
       };
       initData.minAmount.assertLessThan(
         initData.maxAmount,
-        'Invalid amount range!'
+        ConfigErrors.invalidAmountRange
       );
     }
 
@@ -404,14 +416,10 @@ class BurnParams extends AmountParams {
 
     if (config.fixedAmount.toBoolean()) {
       if (data.fixedAmount === undefined) {
-        throw new Error(
-          'BurnConfig requires a fixed amount, but no `fixedAmount` was provided in params data.'
-        );
+        throw new Error(ConfigErrors.invalidBurnConfigData);
       }
       if (data.minAmount !== undefined || data.maxAmount !== undefined) {
-        throw new Error(
-          'BurnConfig requires a fixed amount; `minAmount` and `maxAmount` should not be provided in params data.'
-        );
+        throw new Error(ConfigErrors.invalidBurnConfigData);
       }
       initData = {
         fixedAmount: data.fixedAmount,
@@ -420,14 +428,10 @@ class BurnParams extends AmountParams {
       };
     } else {
       if (data.minAmount === undefined || data.maxAmount === undefined) {
-        throw new Error(
-          'BurnConfig requires a ranged amount, but `minAmount` or `maxAmount` was not provided in params data.'
-        );
+        throw new Error(ConfigErrors.invalidBurnConfigData);
       }
       if (data.fixedAmount !== undefined) {
-        throw new Error(
-          'BurnConfig requires a ranged amount; `fixedAmount` should not be provided in params data.'
-        );
+        throw new Error(ConfigErrors.invalidBurnConfigData);
       }
       initData = {
         fixedAmount: UInt64.from(0),
@@ -436,7 +440,7 @@ class BurnParams extends AmountParams {
       };
       initData.minAmount.assertLessThan(
         initData.maxAmount,
-        'Invalid amount range!'
+        ConfigErrors.invalidAmountRange
       );
     }
 
@@ -529,7 +533,8 @@ class DynamicProofConfig extends Struct({
    * @returns Packed 24-bit Field.
    */
   static packConfigs(configs: DynamicProofConfig[]): Field {
-    if (configs.length !== 4) throw new Error('Exactly 4 configs required.');
+    if (configs.length !== 4)
+      throw new Error(ConfigErrors.invalidDynamicProofConfigCount);
 
     const bits = configs.flatMap((config) => config.toBits());
     return Field.fromBits(bits);

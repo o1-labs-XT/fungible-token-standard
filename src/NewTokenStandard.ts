@@ -32,6 +32,7 @@ import {
   UpdatesDynamicProofConfig,
   DynamicProofConfig,
   OperationKeys,
+  ConfigErrors,
 } from './configs.js';
 import { SideloadedProof } from './side-loaded/program.eg.js';
 
@@ -60,18 +61,61 @@ interface FungibleTokenDeployProps extends Exclude<DeployArgs, undefined> {
 }
 
 const FungibleTokenErrors = {
-  noAdminKey: 'could not fetch admin contract key',
-  noPermissionToChangeAdmin: 'Not allowed to change admin contract',
-  noPermissionToMint: 'Not allowed to mint tokens',
-  noPermissionToBurn: 'Not allowed to burn tokens',
-  noPermissionToPause: 'Not allowed to pause token',
-  noPermissionToResume: 'Not allowed to resume token',
-  noTransferFromCirculation: "Can't transfer to/from the circulation account",
-  noPermissionChangeAllowed:
-    "Can't change permissions for access or receive on token accounts",
+  // Admin & Authorization
+  noPermissionToChangeAdmin:
+    'Unauthorized: Admin signature required to change admin',
+  noPermissionToChangeVerificationKey:
+    'Unauthorized: Admin signature required to update verification key',
+
+  // Token Operations
+  noPermissionToMint:
+    'Unauthorized: Minting not allowed with current configuration',
+  noPermissionToBurn:
+    'Unauthorized: Burning not allowed with current configuration',
+  noTransferFromCirculation:
+    'Invalid operation: Cannot transfer to/from circulation tracking account',
+
+  // Side-loaded Proof Validation
+  vKeyMapOutOfSync:
+    'Verification failed: Off-chain verification key map is out of sync with on-chain state',
+  invalidOperationKey:
+    'Invalid operation key: Must be 1 (Mint), 2 (Burn), 3 (Transfer), or 4 (ApproveBase)',
+  invalidSideLoadedVKey:
+    'Verification failed: Provided verification key does not match registered hash',
+  missingVKeyForOperation:
+    'Missing verification key: No key registered for this operation type',
+  recipientMismatch:
+    'Verification failed: Proof recipient does not match method parameter',
+  tokenIdMismatch:
+    'Verification failed: Token ID in proof does not match contract token ID',
+  incorrectMinaTokenId:
+    'Verification failed: Expected native MINA token ID (1)',
+  minaBalanceMismatch:
+    'Verification failed: MINA balance changed between proof generation and verification',
+  customTokenBalanceMismatch:
+    'Verification failed: Custom token balance changed between proof generation and verification',
+  minaNonceMismatch:
+    'Verification failed: MINA account nonce changed between proof generation and verification',
+  customTokenNonceMismatch:
+    'Verification failed: Custom token account nonce changed between proof generation and verification',
+
+  // Transaction Validation
   flashMinting:
-    'Flash-minting or unbalanced transaction detected. Please make sure that your transaction is balanced, and that your `AccountUpdate`s are ordered properly, so that tokens are not received before they are sent.',
-  unbalancedTransaction: 'Transaction is unbalanced',
+    'Transaction invalid: Flash-minting detected. Ensure AccountUpdates are properly ordered and transaction is balanced',
+  unbalancedTransaction:
+    'Transaction invalid: Token debits and credits do not balance to zero',
+  noPermissionChangeAllowed:
+    'Permission denied: Cannot modify access or receive permissions on token accounts',
+
+  // Method Overrides
+  useCustomApproveMethod:
+    'Method overridden: Use approveBaseCustom() for side-loaded proof support instead of approveBase()',
+  useCustomApproveAccountUpdate:
+    'Method overridden: Use approveAccountUpdateCustom() for side-loaded proof support instead of approveAccountUpdate()',
+  useCustomApproveAccountUpdates:
+    'Method overridden: Use approveAccountUpdatesCustom() for side-loaded proof support instead of approveAccountUpdates()',
+  useCustomTransferMethod:
+    'Method overridden: Use transferCustom() for side-loaded proof support instead of transfer()',
 };
 
 class FungibleToken extends TokenContract {
@@ -178,7 +222,7 @@ class FungibleToken extends TokenContract {
   async updateVerificationKey(vk: VerificationKey) {
     const canChangeVerificationKey = await this.canChangeVerificationKey(vk);
     canChangeVerificationKey.assertTrue(
-      FungibleTokenErrors.noPermissionToChangeAdmin
+      FungibleTokenErrors.noPermissionToChangeVerificationKey
     );
     this.account.verificationKey.set(vk);
   }
@@ -212,7 +256,7 @@ class FungibleToken extends TokenContract {
     const currentRoot = this.vKeyMapRoot.getAndRequireEquals();
     currentRoot.assertEquals(
       vKeyMap.root,
-      'Off-chain side-loaded vKey Merkle Map is out of sync!'
+      FungibleTokenErrors.vKeyMapOutOfSync
     );
 
     const isValidOperationKey = operationKey
@@ -221,7 +265,7 @@ class FungibleToken extends TokenContract {
       .or(operationKey.equals(OperationKeys.Transfer))
       .or(operationKey.equals(OperationKeys.ApproveBase));
 
-    isValidOperationKey.assertTrue('Please enter a valid operation key!');
+    isValidOperationKey.assertTrue(FungibleTokenErrors.invalidOperationKey);
 
     const newVKeyHash = vKey.hash;
     vKeyMap = vKeyMap.clone();
@@ -344,7 +388,7 @@ class FungibleToken extends TokenContract {
   }
 
   override async transfer(from: PublicKey, to: PublicKey, amount: UInt64) {
-    throw Error('Use transferCustom() method instead.');
+    throw Error(FungibleTokenErrors.useCustomTransferMethod);
   }
 
   @method
@@ -403,19 +447,19 @@ class FungibleToken extends TokenContract {
   }
 
   async approveBase(forest: AccountUpdateForest): Promise<void> {
-    throw new Error('Use the approveBaseCustom method instead');
+    throw new Error(FungibleTokenErrors.useCustomApproveMethod);
   }
 
   override async approveAccountUpdate(
     accountUpdate: AccountUpdate | AccountUpdateTree
   ) {
-    throw new Error('Use the approveAccountUpdateCustom method instead');
+    throw new Error(FungibleTokenErrors.useCustomApproveAccountUpdate);
   }
 
   override async approveAccountUpdates(
     accountUpdates: (AccountUpdate | AccountUpdateTree)[]
   ) {
-    throw new Error('Use the approveAccountUpdatesCustom method instead');
+    throw new Error(FungibleTokenErrors.useCustomApproveAccountUpdates);
   }
 
   /** Approve `AccountUpdate`s that have been created outside of the token contract.
@@ -694,9 +738,7 @@ class FungibleToken extends TokenContract {
       vkeyMapRoot.equals(vKeyMap.root),
       Bool(true)
     );
-    isRootCompliant.assertTrue(
-      'Off-chain side-loaded vKey Merkle Map is out of sync!'
-    );
+    isRootCompliant.assertTrue(FungibleTokenErrors.vKeyMapOutOfSync);
 
     const operationVKeyHashOption = vKeyMap.getOption(operationKey);
     const vKeyHashIsSome = Provable.if(
@@ -704,9 +746,7 @@ class FungibleToken extends TokenContract {
       operationVKeyHashOption.isSome,
       Bool(true)
     );
-    vKeyHashIsSome.assertTrue(
-      'Verification key hash is missing for this operation. Please make sure to register it before verifying a side-loaded proof when `shouldVerify` is enabled in the config.'
-    );
+    vKeyHashIsSome.assertTrue(FungibleTokenErrors.missingVKeyForOperation);
 
     // Ensure the provided side-loaded verification key hash matches the stored on-chain state.
     //! This is the same as the isSome check but is given a value here to ignore an error when `shouldVerify` is false.
@@ -716,7 +756,7 @@ class FungibleToken extends TokenContract {
       vk.hash.equals(operationVKeyHash),
       Bool(true)
     );
-    isVKeyValid.assertTrue('Invalid side-loaded verification key!');
+    isVKeyValid.assertTrue(FungibleTokenErrors.invalidSideLoadedVKey);
 
     const { address } = proof.publicInput;
 
@@ -726,7 +766,7 @@ class FungibleToken extends TokenContract {
       address.equals(recipient).or(requireRecipientMatch.not()),
       Bool(true)
     );
-    isRecipientValid.assertTrue('Recipient mismatch in side-loaded proof!');
+    isRecipientValid.assertTrue(FungibleTokenErrors.recipientMismatch);
 
     const {
       minaAccountData,
@@ -745,14 +785,14 @@ class FungibleToken extends TokenContract {
         .equals(this.deriveTokenId())
         .or(requireTokenIdMatch.not()),
       Bool(true)
-    ).assertTrue('Token ID mismatch between input and output.');
+    ).assertTrue(FungibleTokenErrors.tokenIdMismatch);
 
     // Ensure the MINA account data uses native MINA.
     Provable.if(
       shouldVerify,
       minaAccountData.tokenId.equals(1),
       Bool(true)
-    ).assertTrue('Incorrect token ID; expected native MINA.');
+    ).assertTrue(FungibleTokenErrors.incorrectMinaTokenId);
 
     // Verify that the MINA balance captured during proof generation matches the current on-chain balance at verification.
     // unless balance matching is not enforced.
@@ -763,7 +803,7 @@ class FungibleToken extends TokenContract {
         .equals(minaBalance)
         .or(requireMinaBalanceMatch.not()),
       Bool(true)
-    ).assertTrue('Mismatch in MINA account balance.');
+    ).assertTrue(FungibleTokenErrors.minaBalanceMismatch);
 
     // Verify that the CUSTOM TOKEN balance captured during proof generation matches the current on-chain balance at verification.
     // unless balance matching is not enforced.
@@ -774,7 +814,7 @@ class FungibleToken extends TokenContract {
         .equals(tokenIdBalance)
         .or(requireCustomTokenBalanceMatch.not()),
       Bool(true)
-    ).assertTrue('Custom token balance inconsistency detected!');
+    ).assertTrue(FungibleTokenErrors.customTokenBalanceMismatch);
 
     // Verify that the MINA account nonce captured during proof generation matches the nonce at verification.
     // unless nonce matching is not enforced.
@@ -785,7 +825,7 @@ class FungibleToken extends TokenContract {
         .equals(minaNonce)
         .or(requireMinaNonceMatch.not()),
       Bool(true)
-    ).assertTrue('Mismatch in MINA account nonce!');
+    ).assertTrue(FungibleTokenErrors.minaNonceMismatch);
 
     // Verify that the CUSTOM TOKEN nonce captured during proof generation matches the nonce at verification.
     // unless nonce matching is not enforced.
@@ -796,7 +836,7 @@ class FungibleToken extends TokenContract {
         .equals(tokenIdNonce)
         .or(requireCustomTokenNonceMatch.not()),
       Bool(true)
-    ).assertTrue('Mismatch in Custom token account nonce!');
+    ).assertTrue(FungibleTokenErrors.customTokenNonceMismatch);
 
     // Conditionally verify the provided side-loaded proof.
     proof.verifyIf(vk, shouldVerify);
