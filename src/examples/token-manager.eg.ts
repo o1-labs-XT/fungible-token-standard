@@ -154,7 +154,7 @@ export class TokenManager extends SmartContract {
     const token = new FungibleToken(this.tokenAddress.getAndRequireEquals());
     const sender = this.sender.getUnconstrained();
 
-    await token.transferCustom(
+    await token.transferCustomWithProof(
       this.address,
       sender,
       amount,
@@ -275,7 +275,7 @@ const initialMintTx = await Mina.transaction(
   { sender: deployer, fee },
   async () => {
     AccountUpdate.fundNewAccount(deployer, 1);
-    await fungibleToken.mint(
+    await fungibleToken.mintWithProof(
       tokenManagerAddress,
       initialMintAmountToTm,
       dummyFtProof,

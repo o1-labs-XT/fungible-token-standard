@@ -92,7 +92,13 @@ const mintTx = await Mina.transaction(
   },
   async () => {
     AccountUpdate.fundNewAccount(owner, 2);
-    await token.mint(alexa, new UInt64(300), dummyProof, vKey, vKeyMap);
+    await token.mintWithProof(
+      alexa,
+      new UInt64(300),
+      dummyProof,
+      vKey,
+      vKeyMap
+    );
   }
 );
 // console.log(mintTx.toPretty().length, mintTx.toPretty());
@@ -141,7 +147,13 @@ const mintTx2 = await Mina.transaction(
     fee,
   },
   async () => {
-    await token.mint(alexa, new UInt64(200), dummyProof, vKey, vKeyMap);
+    await token.mintWithProof(
+      alexa,
+      new UInt64(200),
+      dummyProof,
+      vKey,
+      vKeyMap
+    );
   }
 );
 await mintTx2.prove();

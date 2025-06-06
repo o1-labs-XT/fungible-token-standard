@@ -86,7 +86,7 @@ const dummyProof: SideloadedProof = await generateDummyDynamicProof(
 );
 const mintTx = await Mina.transaction({ sender: owner, fee }, async () => {
   AccountUpdate.fundNewAccount(owner, 1);
-  await token.mint(alexa, mintParams.maxAmount, dummyProof, dummyVkey, vKeyMap);
+  await token.mint(alexa, mintParams.maxAmount);
 });
 await mintTx.prove();
 mintTx.sign([owner.key, admin.key]);
@@ -109,9 +109,6 @@ const transferTx = await Mina.transaction({ sender: alexa, fee }, async () => {
     alexa,
     billy,
     mintParams.maxAmount,
-    dummyProof,
-    dummyVkey,
-    vKeyMap
   );
 });
 
@@ -134,9 +131,6 @@ const burnTx = await Mina.transaction({ sender: billy, fee }, async () => {
   await token.burn(
     billy,
     burnParams.fixedAmount,
-    dummyProof,
-    dummyVkey,
-    vKeyMap
   );
 });
 await burnTx.prove();

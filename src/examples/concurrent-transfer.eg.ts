@@ -69,9 +69,6 @@ async function sendNoWait(
         from.publicKey,
         to,
         new UInt64(amount),
-        dummyProof,
-        dummyVkey,
-        vKeyMap
       );
     }
   );
@@ -167,9 +164,6 @@ const mintTx = await Mina.transaction(
     await token.mint(
       alexa.publicKey,
       new UInt64(100e9),
-      dummyProof,
-      dummyVkey,
-      vKeyMap
     );
   }
 );
@@ -191,9 +185,6 @@ const transferTx1 = await Mina.transaction(
       alexa.publicKey,
       billy.publicKey,
       new UInt64(5e9),
-      dummyProof,
-      dummyVkey,
-      vKeyMap
     );
   }
 );

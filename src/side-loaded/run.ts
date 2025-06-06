@@ -116,7 +116,13 @@ const mintTx = await Mina.transaction(
   async () => {
     AccountUpdate.fundNewAccount(owner, 2);
     Provable.log('mina token id: ', AccountUpdate.default(owner).tokenId);
-    await token.mint(alexa, new UInt64(300), dynamicDummyProof, vKey, vKeyMap);
+    await token.mintWithProof(
+      alexa,
+      new UInt64(300),
+      dynamicDummyProof,
+      vKey,
+      vKeyMap
+    );
   }
 );
 // console.log(mintTx.toPretty().length, mintTx.toPretty());
@@ -204,7 +210,13 @@ const mintTx2 = await Mina.transaction(
     fee,
   },
   async () => {
-    await token.mint(alexa, new UInt64(200), dynamicProof, vKey, vKeyMap);
+    await token.mintWithProof(
+      alexa,
+      new UInt64(200),
+      dynamicProof,
+      vKey,
+      vKeyMap
+    );
   }
 );
 // console.log(mintTx.toPretty().length, mintTx.toPretty());
@@ -267,7 +279,13 @@ const mintTx3 = await Mina.transaction(
   async () => {
     // the proof is being reused here!
     //! it would have failed if we didn't update the config to a more flexible one
-    await token.mint(alexa, new UInt64(200), dynamicProof, vKey, vKeyMap);
+    await token.mintWithProof(
+      alexa,
+      new UInt64(200),
+      dynamicProof,
+      vKey,
+      vKeyMap
+    );
   }
 );
 // console.log(mintTx.toPretty().length, mintTx.toPretty());

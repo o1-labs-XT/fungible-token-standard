@@ -156,12 +156,64 @@ describe('New Token Standard ApproveBase Tests', () => {
           fee,
         },
         async () => {
-          await tokenContract.approveAccountUpdatesCustom(
+          await tokenContract.approveAccountUpdatesCustomWithProof(
             [updateSend, updateReceive],
             proof ?? dummyProof,
             vKey ?? dummyVkey,
             vKeyMerkleMap ?? vKeyMap
           );
+        }
+      );
+      await tx.sign(signers).prove();
+      await tx.send();
+
+      const senderBalanceAfter = await tokenContract.getBalanceOf(sender);
+      const receiverBalanceAfter = await tokenContract.getBalanceOf(receiver);
+      expect(senderBalanceAfter).toEqual(senderBalanceBefore.sub(sendAmount));
+      expect(receiverBalanceAfter).toEqual(
+        receiverBalanceBefore.add(sendAmount)
+      );
+
+      if (expectedErrorMessage)
+        throw new Error('Test should have failed but didnt!');
+    } catch (error: unknown) {
+      expect((error as Error).message).toContain(expectedErrorMessage);
+    }
+  }
+
+  async function testApproveSideloadDisabledTx(
+    sender: PublicKey,
+    receiver: PublicKey,
+    signers: PrivateKey[],
+    expectedErrorMessage?: string
+  ) {
+    try {
+      const senderBalanceBefore = await tokenContract.getBalanceOf(sender);
+      const receiverBalanceBefore = await tokenContract.getBalanceOf(receiver);
+
+      const sendAmount = UInt64.from(50);
+      const updateSend = AccountUpdate.createSigned(
+        sender,
+        tokenContract.deriveTokenId()
+      );
+      updateSend.balanceChange = Int64.fromUnsigned(sendAmount).neg();
+
+      const updateReceive = AccountUpdate.create(
+        receiver,
+        tokenContract.deriveTokenId()
+      );
+      updateReceive.balanceChange = Int64.fromUnsigned(sendAmount);
+
+      const tx = await Mina.transaction(
+        {
+          sender: sender,
+          fee,
+        },
+        async () => {
+          await tokenContract.approveAccountUpdatesCustom([
+            updateSend,
+            updateReceive,
+          ]);
         }
       );
       await tx.sign(signers).prove();
@@ -222,7 +274,7 @@ describe('New Token Standard ApproveBase Tests', () => {
       const mintAmount = UInt64.from(1000);
       const tx = await Mina.transaction({ sender: user1, fee }, async () => {
         AccountUpdate.fundNewAccount(user1, 3);
-        await tokenContract.mint(
+        await tokenContract.mintWithProof(
           user1,
           mintAmount,
           dummyProof,
@@ -230,7 +282,7 @@ describe('New Token Standard ApproveBase Tests', () => {
           vKeyMap
         );
 
-        await tokenContract.mint(
+        await tokenContract.mintWithProof(
           user2,
           mintAmount,
           dummyProof,
@@ -251,7 +303,7 @@ describe('New Token Standard ApproveBase Tests', () => {
       const receiverBalanceBefore = await tokenContract.getBalanceOf(user3);
       const tx = await Mina.transaction({ sender: user2, fee }, async () => {
         AccountUpdate.fundNewAccount(user2, 1);
-        await tokenContract.transferCustom(
+        await tokenContract.transferCustomWithProof(
           user2,
           user3,
           transferAmount,
@@ -303,7 +355,7 @@ describe('New Token Standard ApproveBase Tests', () => {
           fee,
         },
         async () => {
-          await tokenContract.approveAccountUpdatesCustom(
+          await tokenContract.approveAccountUpdatesCustomWithProof(
             [updateSend, updateReceive],
             dummyProof,
             dummyVkey,
@@ -345,7 +397,7 @@ describe('New Token Standard ApproveBase Tests', () => {
             fee,
           },
           async () => {
-            await tokenContract.approveAccountUpdatesCustom(
+            await tokenContract.approveAccountUpdatesCustomWithProof(
               [updateReceive, updateSend],
               dummyProof,
               dummyVkey,
@@ -374,7 +426,7 @@ describe('New Token Standard ApproveBase Tests', () => {
 
       const approveAccountUpdatesTx = async () => {
         await Mina.transaction(deployer, async () => {
-          await tokenContract.approveAccountUpdatesCustom(
+          await tokenContract.approveAccountUpdatesCustomWithProof(
             [updateSend, updateReceive],
             dummyProof,
             dummyVkey,
@@ -406,7 +458,7 @@ describe('New Token Standard ApproveBase Tests', () => {
           },
           async () => {
             AccountUpdate.fundNewAccount(user2, 1);
-            await tokenContract.approveAccountUpdatesCustom(
+            await tokenContract.approveAccountUpdatesCustomWithProof(
               [updateSend, updateReceive],
               dummyProof,
               dummyVkey,
@@ -442,7 +494,7 @@ describe('New Token Standard ApproveBase Tests', () => {
             fee,
           },
           async () => {
-            await tokenContract.approveAccountUpdatesCustom(
+            await tokenContract.approveAccountUpdatesCustomWithProof(
               [updateSend, updateReceive],
               dummyProof,
               dummyVkey,
@@ -478,12 +530,204 @@ describe('New Token Standard ApproveBase Tests', () => {
             fee,
           },
           async () => {
-            await tokenContract.approveAccountUpdatesCustom(
+            await tokenContract.approveAccountUpdatesCustomWithProof(
               [updateSend, updateReceive],
               dummyProof,
               dummyVkey,
               vKeyMap
             );
+          }
+        );
+      };
+
+      expect(approveAccountUpdatesTx).rejects.toThrowError(
+        FungibleTokenErrors.noTransferFromCirculation
+      );
+    });
+
+    it('should do a transaction constructed manually with approveSideloadDisabled', async () => {
+      const sendAmount = UInt64.from(10);
+
+      const updateSend = AccountUpdate.createSigned(
+        tokenA,
+        tokenContract.deriveTokenId()
+      );
+      updateSend.balanceChange = Int64.fromUnsigned(sendAmount).neg();
+      const updateReceive = AccountUpdate.create(
+        user1,
+        tokenContract.deriveTokenId()
+      );
+      updateReceive.balanceChange = Int64.fromUnsigned(sendAmount);
+
+      const approveAccountUpdatesTx = async () => {
+        await Mina.transaction(
+          {
+            sender: deployer,
+            fee,
+          },
+          async () => {
+            await tokenContract.approveAccountUpdatesCustom([
+              updateSend,
+              updateReceive,
+            ]);
+          }
+        );
+      };
+
+      expect(approveAccountUpdatesTx).rejects.toThrowError(
+        FungibleTokenErrors.noTransferFromCirculation
+      );
+    });
+
+    it('should reject flash-minting transactions with approveSideloadDisabled', async () => {
+      const sendAmount = UInt64.from(50);
+      const updateSend = AccountUpdate.createSigned(
+        user2,
+        tokenContract.deriveTokenId()
+      );
+      updateSend.balanceChange = Int64.fromUnsigned(sendAmount).neg();
+      const updateReceive = AccountUpdate.create(
+        user1,
+        tokenContract.deriveTokenId()
+      );
+      updateReceive.balanceChange = Int64.fromUnsigned(sendAmount);
+      updateReceive;
+      const approveAccountUpdatesTx = async () => {
+        await Mina.transaction(
+          {
+            sender: deployer,
+            fee,
+          },
+          async () => {
+            await tokenContract.approveAccountUpdatesCustom([
+              updateReceive,
+              updateSend,
+            ]);
+          }
+        );
+      };
+      expect(approveAccountUpdatesTx).rejects.toThrowError(
+        FungibleTokenErrors.flashMinting
+      );
+    });
+
+    it('should reject unbalanced transactions with approveSideloadDisabled', async () => {
+      const sendAmount = UInt64.from(1);
+      const updateSend = AccountUpdate.createSigned(
+        user2,
+        tokenContract.deriveTokenId()
+      );
+      updateSend.balanceChange = Int64.fromUnsigned(sendAmount).neg();
+      const updateReceive = AccountUpdate.create(
+        user1,
+        tokenContract.deriveTokenId()
+      );
+      updateReceive.balanceChange = Int64.fromUnsigned(sendAmount).mul(2);
+
+      const approveAccountUpdatesTx = async () => {
+        await Mina.transaction(deployer, async () => {
+          await tokenContract.approveAccountUpdatesCustom([
+            updateSend,
+            updateReceive,
+          ]);
+        });
+      };
+
+      expect(approveAccountUpdatesTx).rejects.toThrowError(
+        FungibleTokenErrors.flashMinting
+      );
+    });
+
+    it('rejects transactions with mismatched tokens with approveSideloadDisabled', async () => {
+      const sendAmount = UInt64.from(10);
+      const updateSend = AccountUpdate.createSigned(
+        user2,
+        tokenContract.deriveTokenId()
+      );
+      updateSend.balanceChange = Int64.fromUnsigned(sendAmount).neg();
+      const updateReceive = AccountUpdate.create(user1, Field(1));
+      updateReceive.balanceChange = Int64.fromUnsigned(sendAmount);
+
+      const approveAccountUpdatesTx = async () => {
+        await Mina.transaction(
+          {
+            sender: deployer,
+            fee,
+          },
+          async () => {
+            AccountUpdate.fundNewAccount(user2, 1);
+            await tokenContract.approveAccountUpdatesCustom([
+              updateSend,
+              updateReceive,
+            ]);
+          }
+        );
+      };
+
+      expect(approveAccountUpdatesTx).rejects.toThrowError(
+        FungibleTokenErrors.unbalancedTransaction
+      );
+    });
+
+    it("Should reject manually constructed transfers from the account that's tracking circulation with approveSideloadDisabled", async () => {
+      const sendAmount = UInt64.from(10);
+
+      const updateSend = AccountUpdate.createSigned(
+        tokenA,
+        tokenContract.deriveTokenId()
+      );
+      updateSend.balanceChange = Int64.fromUnsigned(sendAmount).neg();
+      const updateReceive = AccountUpdate.create(
+        user1,
+        tokenContract.deriveTokenId()
+      );
+      updateReceive.balanceChange = Int64.fromUnsigned(sendAmount);
+
+      const approveAccountUpdatesTx = async () => {
+        await Mina.transaction(
+          {
+            sender: deployer,
+            fee,
+          },
+          async () => {
+            await tokenContract.approveAccountUpdatesCustom([
+              updateSend,
+              updateReceive,
+            ]);
+          }
+        );
+      };
+
+      expect(approveAccountUpdatesTx).rejects.toThrowError(
+        FungibleTokenErrors.noTransferFromCirculation
+      );
+    });
+
+    it("Should reject manually constructed transfers to the account that's tracking circulation with approveSideloadDisabled", async () => {
+      const sendAmount = UInt64.from(10);
+
+      const updateSend = AccountUpdate.createSigned(
+        user2,
+        tokenContract.deriveTokenId()
+      );
+      updateSend.balanceChange = Int64.fromUnsigned(sendAmount).neg();
+      const updateReceive = AccountUpdate.create(
+        tokenA,
+        tokenContract.deriveTokenId()
+      );
+      updateReceive.balanceChange = Int64.fromUnsigned(sendAmount);
+
+      const approveAccountUpdatesTx = async () => {
+        await Mina.transaction(
+          {
+            sender: deployer,
+            fee,
+          },
+          async () => {
+            await tokenContract.approveAccountUpdatesCustom([
+              updateSend,
+              updateReceive,
+            ]);
           }
         );
       };
@@ -514,11 +758,41 @@ describe('New Token Standard ApproveBase Tests', () => {
             fee,
           },
           async () => {
-            await tokenContract.approveBaseCustom(
+            await tokenContract.approveBaseCustomWithProof(
               AccountUpdateForest.fromFlatArray([updateSend]),
               dummyProof,
               dummyVkey,
               vKeyMap
+            );
+          }
+        );
+      };
+
+      expect(approveBaseTx).rejects.toThrowError(
+        FungibleTokenErrors.noPermissionChangeAllowed
+      );
+    });
+    it("should reject a transaction that's changing the account permission for receive with approveBaseSideloadDisabled", async () => {
+      const permissions = Mina.getAccount(
+        user2,
+        tokenContract.deriveTokenId()
+      ).permissions;
+      permissions.receive = Permissions.impossible();
+      const updateSend = AccountUpdate.createSigned(
+        user2,
+        tokenContract.deriveTokenId()
+      );
+      updateSend.account.permissions.set(permissions);
+
+      const approveBaseTx = async () => {
+        await Mina.transaction(
+          {
+            sender: user2,
+            fee,
+          },
+          async () => {
+            await tokenContract.approveBaseCustom(
+              AccountUpdateForest.fromFlatArray([updateSend])
             );
           }
         );
@@ -631,10 +905,13 @@ describe('New Token Standard ApproveBase Tests', () => {
     });
 
     it('should update the side-loaded vKey hash for updates', async () => {
-      await updateSLVkeyHashTx(user1, programVkey, vKeyMap, OperationKeys.ApproveBase, [
-        user1.key,
-        tokenAdmin.key,
-      ]);
+      await updateSLVkeyHashTx(
+        user1,
+        programVkey,
+        vKeyMap,
+        OperationKeys.ApproveBase,
+        [user1.key, tokenAdmin.key]
+      );
       vKeyMap.set(OperationKeys.ApproveBase, programVkey.hash);
       expect(tokenContract.vKeyMapRoot.get()).toEqual(vKeyMap.root);
     });
@@ -655,6 +932,17 @@ describe('New Token Standard ApproveBase Tests', () => {
         dummyProof,
         dummyVkey,
         tamperedVKeyMap,
+        expectedErrorMessage
+      );
+    });
+
+    it('should reject approveSideloadDisabled when side-loading is enabled', async () => {
+      const expectedErrorMessage =
+        FungibleTokenErrors.noPermissionForSideloadDisabledOperation;
+      await testApproveSideloadDisabledTx(
+        user2,
+        user3,
+        [user2.key],
         expectedErrorMessage
       );
     });
@@ -712,10 +1000,13 @@ describe('New Token Standard ApproveBase Tests', () => {
     });
 
     it('should update the side-loaded vKey hash for updates to pause the method', async () => {
-      await updateSLVkeyHashTx(user1, pausedVkey, vKeyMap, OperationKeys.ApproveBase, [
-        user1.key,
-        tokenAdmin.key,
-      ]);
+      await updateSLVkeyHashTx(
+        user1,
+        pausedVkey,
+        vKeyMap,
+        OperationKeys.ApproveBase,
+        [user1.key, tokenAdmin.key]
+      );
       vKeyMap.set(OperationKeys.ApproveBase, pausedVkey.hash);
       expect(tokenContract.vKeyMapRoot.get()).toEqual(vKeyMap.root);
     });

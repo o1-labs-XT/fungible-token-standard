@@ -75,9 +75,6 @@ export class TokenEscrow extends SmartContract {
       sender,
       this.address,
       amount,
-      proof,
-      vk,
-      vKeyMap
     );
 
     const total = this.total.getAndRequireEquals();
@@ -207,9 +204,6 @@ const deployEscrowTx = await Mina.transaction(
 
     await tokenContract.approveAccountUpdateCustom(
       escrowContract.self,
-      dummyProof,
-      dummyVkey,
-      vKeyMap
     );
   }
 );
@@ -235,9 +229,6 @@ const mintAlexaTx = await Mina.transaction(
     await tokenContract.mint(
       alexa,
       mintParams.maxAmount,
-      dummyProof,
-      dummyVkey,
-      vKeyMap
     );
   }
 );
@@ -255,9 +246,6 @@ const mintBillyTx = await Mina.transaction(
     await tokenContract.mint(
       billy,
       mintParams.maxAmount,
-      dummyProof,
-      dummyVkey,
-      vKeyMap
     );
   }
 );
@@ -282,9 +270,6 @@ const depositTx1 = await Mina.transaction(
     );
     await tokenContract.approveAccountUpdateCustom(
       escrowContract.self,
-      dummyProof,
-      dummyVkey,
-      vKeyMap
     );
   }
 );
@@ -315,9 +300,6 @@ const depositTx2 = await Mina.transaction(
     );
     await tokenContract.approveAccountUpdateCustom(
       escrowContract.self,
-      dummyProof,
-      dummyVkey,
-      vKeyMap
     );
   }
 );
@@ -347,9 +329,6 @@ const withdrawTx = await Mina.transaction(
     await escrowContract.withdraw(jackie, new UInt64(25));
     await tokenContract.approveAccountUpdateCustom(
       escrowContract.self,
-      dummyProof,
-      dummyVkey,
-      vKeyMap
     );
   }
 );
@@ -378,9 +357,6 @@ const directWithdrawTx = await Mina.transaction(
       escrowContractKeyPair.publicKey,
       jackie,
       new UInt64(10),
-      dummyProof,
-      dummyVkey,
-      vKeyMap
     );
   }
 );

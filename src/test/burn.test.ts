@@ -105,7 +105,7 @@ describe('New Token Standard Burn Tests', () => {
       const userBalanceBefore = await tokenContract.getBalanceOf(user);
       const tx = await Mina.transaction({ sender: user, fee }, async () => {
         AccountUpdate.fundNewAccount(user, numberOfAccounts);
-        await tokenContract.burn(
+        await tokenContract.burnWithProof(
           user,
           burnAmount,
           dummyProof,
@@ -294,7 +294,7 @@ describe('New Token Standard Burn Tests', () => {
     try {
       const userBalanceBefore = await tokenContract.getBalanceOf(user);
       const tx = await Mina.transaction({ sender: user, fee }, async () => {
-        await tokenContract.burn(
+        await tokenContract.burnWithProof(
           user,
           burnAmount,
           proof ?? dummyProof,
@@ -315,170 +315,28 @@ describe('New Token Standard Burn Tests', () => {
     }
   }
 
-  async function updateBurnFixedAmountConfigTx(
+  async function testBurnSideloadDisabledTx(
     user: PublicKey,
-    value: Bool,
+    burnAmount: UInt64,
     signers: PrivateKey[],
-    expectedErrorMessage?: string
+    expectedErrorMessage?: string,
+    numberOfAccounts = 2
   ) {
     try {
+      const userBalanceBefore = await tokenContract.getBalanceOf(user);
       const tx = await Mina.transaction({ sender: user, fee }, async () => {
-        await tokenContract.updateBurnFixedAmountConfig(value);
+        AccountUpdate.fundNewAccount(user, numberOfAccounts);
+        await tokenContract.burn(user, burnAmount);
       });
       await tx.prove();
       await tx.sign(signers).send().wait();
 
-      const packedConfigsAfter = tokenContract.packedAmountConfigs.get();
-      const burnConfigAfter = BurnConfig.unpack(packedConfigsAfter);
-      expect(burnConfigAfter.fixedAmount).toEqual(value);
+      const userBalanceAfter = await tokenContract.getBalanceOf(user);
+      expect(userBalanceAfter).toEqual(userBalanceBefore.sub(burnAmount));
 
-      if (expectedErrorMessage) {
-        throw new Error(
-          `Test should have failed with '${expectedErrorMessage}' but didnt!`
-        );
-      }
+      if (expectedErrorMessage)
+        throw new Error('Test should have failed but didnt!');
     } catch (error: unknown) {
-      if (!expectedErrorMessage) throw error;
-      expect((error as Error).message).toContain(expectedErrorMessage);
-    }
-  }
-
-  async function updateBurnRangedAmountConfigTx(
-    user: PublicKey,
-    value: Bool,
-    signers: PrivateKey[],
-    expectedErrorMessage?: string
-  ) {
-    try {
-      const tx = await Mina.transaction({ sender: user, fee }, async () => {
-        await tokenContract.updateBurnRangedAmountConfig(value);
-      });
-      await tx.prove();
-      await tx.sign(signers).send().wait();
-
-      const packedConfigsAfter = tokenContract.packedAmountConfigs.get();
-      const burnConfigAfter = BurnConfig.unpack(packedConfigsAfter);
-      expect(burnConfigAfter.rangedAmount).toEqual(value);
-
-      if (expectedErrorMessage) {
-        throw new Error(
-          `Test should have failed with '${expectedErrorMessage}' but didnt!`
-        );
-      }
-    } catch (error: unknown) {
-      if (!expectedErrorMessage) throw error;
-      expect((error as Error).message).toContain(expectedErrorMessage);
-    }
-  }
-
-  async function updateBurnUnauthorizedConfigTx(
-    user: PublicKey,
-    value: Bool,
-    signers: PrivateKey[],
-    expectedErrorMessage?: string
-  ) {
-    try {
-      const tx = await Mina.transaction({ sender: user, fee }, async () => {
-        await tokenContract.updateBurnUnauthorizedConfig(value);
-      });
-      await tx.prove();
-      await tx.sign(signers).send().wait();
-
-      const packedConfigsAfter = tokenContract.packedAmountConfigs.get();
-      const burnConfigAfter = BurnConfig.unpack(packedConfigsAfter);
-      expect(burnConfigAfter.unauthorized).toEqual(value);
-
-      if (expectedErrorMessage) {
-        throw new Error(
-          `Test should have failed with '${expectedErrorMessage}' but didnt!`
-        );
-      }
-    } catch (error: unknown) {
-      if (!expectedErrorMessage) throw error;
-      expect((error as Error).message).toContain(expectedErrorMessage);
-    }
-  }
-
-  async function updateBurnFixedAmountTx(
-    user: PublicKey,
-    value: UInt64,
-    signers: PrivateKey[],
-    expectedErrorMessage?: string
-  ) {
-    try {
-      const tx = await Mina.transaction({ sender: user, fee }, async () => {
-        await tokenContract.updateBurnFixedAmount(value);
-      });
-      await tx.prove();
-      await tx.sign(signers).send().wait();
-
-      const packedParams = tokenContract.packedBurnParams.get();
-      const params = BurnParams.unpack(packedParams);
-      expect(params.fixedAmount).toEqual(value);
-
-      if (expectedErrorMessage) {
-        throw new Error(
-          `Test should have failed with '${expectedErrorMessage}' but didnt!`
-        );
-      }
-    } catch (error: unknown) {
-      if (!expectedErrorMessage) throw error;
-      expect((error as Error).message).toContain(expectedErrorMessage);
-    }
-  }
-
-  async function updateBurnMinAmountTx(
-    user: PublicKey,
-    value: UInt64,
-    signers: PrivateKey[],
-    expectedErrorMessage?: string
-  ) {
-    try {
-      const tx = await Mina.transaction({ sender: user, fee }, async () => {
-        await tokenContract.updateBurnMinAmount(value);
-      });
-      await tx.prove();
-      await tx.sign(signers).send().wait();
-
-      const packedParams = tokenContract.packedBurnParams.get();
-      const params = BurnParams.unpack(packedParams);
-      expect(params.minAmount).toEqual(value);
-
-      if (expectedErrorMessage) {
-        throw new Error(
-          `Test should have failed with '${expectedErrorMessage}' but didnt!`
-        );
-      }
-    } catch (error: unknown) {
-      if (!expectedErrorMessage) throw error;
-      expect((error as Error).message).toContain(expectedErrorMessage);
-    }
-  }
-
-  async function updateBurnMaxAmountTx(
-    user: PublicKey,
-    value: UInt64,
-    signers: PrivateKey[],
-    expectedErrorMessage?: string
-  ) {
-    try {
-      const tx = await Mina.transaction({ sender: user, fee }, async () => {
-        await tokenContract.updateBurnMaxAmount(value);
-      });
-      await tx.prove();
-      await tx.sign(signers).send().wait();
-
-      const packedParams = tokenContract.packedBurnParams.get();
-      const params = BurnParams.unpack(packedParams);
-      expect(params.maxAmount).toEqual(value);
-
-      if (expectedErrorMessage) {
-        throw new Error(
-          `Test should have failed with '${expectedErrorMessage}' but didnt!`
-        );
-      }
-    } catch (error: unknown) {
-      if (!expectedErrorMessage) throw error;
       expect((error as Error).message).toContain(expectedErrorMessage);
     }
   }
@@ -524,7 +382,7 @@ describe('New Token Standard Burn Tests', () => {
       const mintAmount = UInt64.from(1000);
       const tx = await Mina.transaction({ sender: user1, fee }, async () => {
         AccountUpdate.fundNewAccount(user1, 3);
-        await tokenContract.mint(
+        await tokenContract.mintWithProof(
           user1,
           mintAmount,
           dummyProof,
@@ -532,7 +390,7 @@ describe('New Token Standard Burn Tests', () => {
           vKeyMap
         );
 
-        await tokenContract.mint(
+        await tokenContract.mintWithProof(
           user2,
           mintAmount,
           dummyProof,
@@ -550,12 +408,41 @@ describe('New Token Standard Burn Tests', () => {
       await testBurnTx(user2, UInt64.from(100), [user2.key], undefined, 0);
     });
 
+    it('should allow burning without authorization with burnSideloadDisabled', async () => {
+      await testBurnSideloadDisabledTx(
+        user2,
+        UInt64.from(100),
+        [user2.key],
+        undefined,
+        0
+      );
+    });
+
     it('should burn an amount within the valid range: user', async () => {
       await testBurnTx(user1, UInt64.from(50), [user1.key], undefined, 0);
     });
 
+    it('should burn an amount within the valid range with burnSideloadDisabled', async () => {
+      await testBurnSideloadDisabledTx(
+        user1,
+        UInt64.from(50),
+        [user1.key],
+        undefined,
+        0
+      );
+    });
+
     it('should reject burning an amount outside the valid range', async () => {
       await testBurnTx(
+        user1,
+        UInt64.from(700),
+        [user1.key],
+        'Not allowed to burn tokens'
+      );
+    });
+
+    it('should reject burning an amount outside the valid range with burnSideloadDisabled', async () => {
+      await testBurnSideloadDisabledTx(
         user1,
         UInt64.from(700),
         [user1.key],
@@ -569,7 +456,7 @@ describe('New Token Standard Burn Tests', () => {
       try {
         const tx = await Mina.transaction({ sender: user2, fee }, async () => {
           AccountUpdate.fundNewAccount(user2, 2);
-          await tokenContract.burn(
+          await tokenContract.burnWithProof(
             tokenContract.address,
             UInt64.from(100),
             dummyProof,
@@ -584,6 +471,15 @@ describe('New Token Standard Burn Tests', () => {
       } catch (error: unknown) {
         expect((error as Error).message).toContain(expectedErrorMessage);
       }
+    });
+
+    it('should reject burning from the circulating supply account with burnSideloadDisabled', async () => {
+      await testBurnSideloadDisabledTx(
+        tokenContract.address,
+        UInt64.from(100),
+        [user2.key],
+        "Can't transfer to/from the circulation account"
+      );
     });
   });
 
@@ -1034,8 +930,28 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
+    it('should reject burning an amount different from the fixed value with burnSideloadDisabled', async () => {
+      await testBurnSideloadDisabledTx(
+        user1,
+        UInt64.from(50),
+        [user1.key],
+        'Not allowed to burn tokens',
+        0
+      );
+    });
+
     it('should only burn an amount equal to the fixed value', async () => {
       await testBurnTx(user2, UInt64.from(150), [user2.key], undefined, 0);
+    });
+
+    it('should only burn an amount equal to the fixed value with burnSideloadDisabled', async () => {
+      await testBurnSideloadDisabledTx(
+        user2,
+        UInt64.from(150),
+        [user2.key],
+        undefined,
+        0
+      );
     });
   });
 
@@ -1258,6 +1174,15 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
+    it('should reject burn with burnSideloadDisabled', async () => {
+      await testBurnSideloadDisabledTx(
+        user1,
+        UInt64.from(150),
+        [user1.key],
+        FungibleTokenErrors.noPermissionForSideloadDisabledOperation
+      );
+    });
+
     it('should reject burn for a non-compliant proof recipient', async () => {
       const dynamicProof = await generateDynamicProof(
         tokenContract.deriveTokenId(),
@@ -1336,7 +1261,7 @@ describe('New Token Standard Burn Tests', () => {
       const burnTx = await Mina.transaction(
         { sender: user1, fee },
         async () => {
-          await tokenContract.burn(
+          await tokenContract.burnWithProof(
             user2,
             UInt64.from(150),
             dynamicProof,

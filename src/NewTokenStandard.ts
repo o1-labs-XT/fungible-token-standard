@@ -66,6 +66,8 @@ const FungibleTokenErrors = {
   noPermissionToBurn: 'Not allowed to burn tokens',
   noPermissionToPause: 'Not allowed to pause token',
   noPermissionToResume: 'Not allowed to resume token',
+  noPermissionForSideloadDisabledOperation:
+    "Can't use the method, side-loading is enabled in config",
   noTransferFromCirculation: "Can't transfer to/from the circulation account",
   noPermissionChangeAllowed:
     "Can't change permissions for access or receive on token accounts",
@@ -250,12 +252,63 @@ class FungibleToken extends TokenContract {
   }
 
   @method.returns(AccountUpdate)
-  async mint(
+  async mintWithProof(
     recipient: PublicKey,
     amount: UInt64,
     proof: SideloadedProof,
     vk: VerificationKey, // provide the full verification key since only the hash is stored.
     vKeyMap: VKeyMerkleMap
+  ): Promise<AccountUpdate> {
+    const packedDynamicProofConfigs =
+      this.packedDynamicProofConfigs.getAndRequireEquals();
+    const mintDynamicProofConfig = MintDynamicProofConfig.unpack(
+      packedDynamicProofConfigs
+    );
+
+    await this.verifySideLoadedProof(
+      proof,
+      vk,
+      recipient,
+      mintDynamicProofConfig,
+      vKeyMap,
+      OperationKeys.Mint
+    );
+
+    return await this.#internalMint(recipient, amount);
+  }
+
+  /**
+   * Mints tokens to a recipient without requiring side-loaded proof verification.
+   * This function can only be used when dynamic proof verification is disabled in the mint configuration.
+   *
+   * @param recipient - The public key of the account to receive the minted tokens
+   * @param amount - The amount of tokens to mint
+   * @returns The account update for the mint operation
+   * @throws {Error} If dynamic proof verification is enabled in the mint configuration
+   * @throws {Error} If the recipient is the circulation account
+   * @throws {Error} If the minting operation is not authorized
+   */
+  @method.returns(AccountUpdate)
+  async mint(recipient: PublicKey, amount: UInt64): Promise<AccountUpdate> {
+    const packedDynamicProofConfigs =
+      this.packedDynamicProofConfigs.getAndRequireEquals();
+    const mintDynamicProofConfig = MintDynamicProofConfig.unpack(
+      packedDynamicProofConfigs
+    );
+    mintDynamicProofConfig.shouldVerify.assertFalse(
+      FungibleTokenErrors.noPermissionForSideloadDisabledOperation
+    );
+
+    return await this.#internalMint(recipient, amount);
+  }
+
+  /**
+   * Internal mint implementation shared by both mint() and mintWithProof().
+   * Contains the core minting logic without proof verification.
+   */
+  async #internalMint(
+    recipient: PublicKey,
+    amount: UInt64
   ): Promise<AccountUpdate> {
     const accountUpdate = this.internal.mint({ address: recipient, amount });
     accountUpdate.body.useFullCommitment;
@@ -281,31 +334,67 @@ class FungibleToken extends TokenContract {
 
     circulationUpdate.balanceChange = Int64.fromUnsigned(amount);
 
+    return accountUpdate;
+  }
+
+  @method.returns(AccountUpdate)
+  async burnWithProof(
+    from: PublicKey,
+    amount: UInt64,
+    proof: SideloadedProof,
+    vk: VerificationKey,
+    vKeyMap: VKeyMerkleMap
+  ): Promise<AccountUpdate> {
     const packedDynamicProofConfigs =
       this.packedDynamicProofConfigs.getAndRequireEquals();
-    const mintDynamicProofConfig = MintDynamicProofConfig.unpack(
+    const burnDynamicProofConfig = BurnDynamicProofConfig.unpack(
       packedDynamicProofConfigs
     );
 
     await this.verifySideLoadedProof(
       proof,
       vk,
-      recipient,
-      mintDynamicProofConfig,
+      from,
+      burnDynamicProofConfig,
       vKeyMap,
-      OperationKeys.Mint
+      OperationKeys.Burn
     );
 
-    return accountUpdate;
+    return await this.#internalBurn(from, amount);
   }
 
+  /**
+   * Burns tokens from an account without requiring side-loaded proof verification.
+   * This function can only be used when dynamic proof verification is disabled in the burn configuration.
+   *
+   * @param from - The public key of the account to burn tokens from
+   * @param amount - The amount of tokens to burn
+   * @returns The account update for the burn operation
+   * @throws {Error} If dynamic proof verification is enabled in the burn configuration
+   * @throws {Error} If the from account is the circulation account
+   * @throws {Error} If the burning operation is not authorized
+   */
   @method.returns(AccountUpdate)
-  async burn(
+  async burn(from: PublicKey, amount: UInt64): Promise<AccountUpdate> {
+    const packedDynamicProofConfigs =
+      this.packedDynamicProofConfigs.getAndRequireEquals();
+    const burnDynamicProofConfig = BurnDynamicProofConfig.unpack(
+      packedDynamicProofConfigs
+    );
+    burnDynamicProofConfig.shouldVerify.assertFalse(
+      FungibleTokenErrors.noPermissionForSideloadDisabledOperation
+    );
+
+    return await this.#internalBurn(from, amount);
+  }
+
+  /**
+   * Internal burn implementation shared by both burn() and burnWithProof().
+   * Contains the core burning logic without proof verification.
+   */
+  async #internalBurn(
     from: PublicKey,
-    amount: UInt64,
-    proof: SideloadedProof,
-    vk: VerificationKey,
-    vKeyMap: VKeyMerkleMap
+    amount: UInt64
   ): Promise<AccountUpdate> {
     const accountUpdate = this.internal.burn({ address: from, amount });
 
@@ -325,30 +414,17 @@ class FungibleToken extends TokenContract {
     circulationUpdate.balanceChange = Int64.fromUnsigned(amount).neg();
     this.emitEvent('Burn', new BurnEvent({ from, amount }));
 
-    const packedDynamicProofConfigs =
-      this.packedDynamicProofConfigs.getAndRequireEquals();
-    const burnDynamicProofConfig = BurnDynamicProofConfig.unpack(
-      packedDynamicProofConfigs
-    );
-
-    await this.verifySideLoadedProof(
-      proof,
-      vk,
-      from,
-      burnDynamicProofConfig,
-      vKeyMap,
-      OperationKeys.Burn
-    );
-
     return accountUpdate;
   }
 
   override async transfer(from: PublicKey, to: PublicKey, amount: UInt64) {
-    throw Error('Use transferCustom() method instead.');
+    throw Error(
+      'Use transferCustom() or transferCustomWithProof() method instead.'
+    );
   }
 
   @method
-  async transferCustom(
+  async transferCustomWithProof(
     from: PublicKey,
     to: PublicKey,
     amount: UInt64,
@@ -356,14 +432,6 @@ class FungibleToken extends TokenContract {
     vk: VerificationKey,
     vKeyMap: VKeyMerkleMap
   ) {
-    from
-      .equals(this.address)
-      .assertFalse(FungibleTokenErrors.noTransferFromCirculation);
-    to.equals(this.address).assertFalse(
-      FungibleTokenErrors.noTransferFromCirculation
-    );
-    this.internal.send({ from, to, amount });
-
     const packedDynamicProofConfigs =
       this.packedDynamicProofConfigs.getAndRequireEquals();
     const transferDynamicProofConfig = TransferDynamicProofConfig.unpack(
@@ -378,6 +446,46 @@ class FungibleToken extends TokenContract {
       vKeyMap,
       OperationKeys.Transfer
     );
+
+    this.internalTransfer(from, to, amount);
+  }
+
+  /**
+   * Transfers tokens between accounts without requiring side-loaded proof verification.
+   * This function can only be used when dynamic proof verification is disabled in the transfer configuration.
+   *
+   * @param from - The public key of the account to transfer tokens from
+   * @param to - The public key of the account to transfer tokens to
+   * @param amount - The amount of tokens to transfer
+   * @throws {Error} If dynamic proof verification is enabled in the transfer configuration
+   * @throws {Error} If either the from or to account is the circulation account
+   */
+  @method
+  async transferCustom(from: PublicKey, to: PublicKey, amount: UInt64) {
+    const packedDynamicProofConfigs =
+      this.packedDynamicProofConfigs.getAndRequireEquals();
+    const transferDynamicProofConfig = TransferDynamicProofConfig.unpack(
+      packedDynamicProofConfigs
+    );
+    transferDynamicProofConfig.shouldVerify.assertFalse(
+      FungibleTokenErrors.noPermissionForSideloadDisabledOperation
+    );
+
+    this.internalTransfer(from, to, amount);
+  }
+
+  /**
+   * Internal transfer implementation shared by both transferCustom() and transferCustomWithProof().
+   * Contains the core transfer logic without proof verification.
+   */
+  private internalTransfer(from: PublicKey, to: PublicKey, amount: UInt64) {
+    from
+      .equals(this.address)
+      .assertFalse(FungibleTokenErrors.noTransferFromCirculation);
+    to.equals(this.address).assertFalse(
+      FungibleTokenErrors.noTransferFromCirculation
+    );
+    this.internal.send({ from, to, amount });
   }
 
   private checkPermissionsUpdate(update: AccountUpdate) {
@@ -403,19 +511,25 @@ class FungibleToken extends TokenContract {
   }
 
   async approveBase(forest: AccountUpdateForest): Promise<void> {
-    throw new Error('Use the approveBaseCustom method instead');
+    throw new Error(
+      'Use the approveBaseCustom() or approveBaseCustomWithProof() method instead'
+    );
   }
 
   override async approveAccountUpdate(
     accountUpdate: AccountUpdate | AccountUpdateTree
   ) {
-    throw new Error('Use the approveAccountUpdateCustom method instead');
+    throw new Error(
+      'Use the approveAccountUpdateCustom() or approveAccountUpdateCustomWithProof() method instead'
+    );
   }
 
   override async approveAccountUpdates(
     accountUpdates: (AccountUpdate | AccountUpdateTree)[]
   ) {
-    throw new Error('Use the approveAccountUpdatesCustom method instead');
+    throw new Error(
+      'Use the approveAccountUpdatesCustom() or approveAccountUpdatesCustomWithProof() method instead'
+    );
   }
 
   /** Approve `AccountUpdate`s that have been created outside of the token contract.
@@ -423,12 +537,92 @@ class FungibleToken extends TokenContract {
    * @argument {AccountUpdateForest} updates - The `AccountUpdate`s to approve. Note that the forest size is limited by the base token contract, @see TokenContract.MAX_ACCOUNT_UPDATES The current limit is 9.
    */
   @method
-  async approveBaseCustom(
+  async approveBaseCustomWithProof(
     updates: AccountUpdateForest,
     proof: SideloadedProof,
     vk: VerificationKey,
     vKeyMap: VKeyMerkleMap
   ): Promise<void> {
+    const packedDynamicProofConfigs =
+      this.packedDynamicProofConfigs.getAndRequireEquals();
+    const updatesDynamicProofConfig = UpdatesDynamicProofConfig.unpack(
+      packedDynamicProofConfigs
+    );
+
+    await this.verifySideLoadedProof(
+      proof,
+      vk,
+      PublicKey.empty(),
+      updatesDynamicProofConfig,
+      vKeyMap,
+      OperationKeys.ApproveBase
+    );
+
+    this.internalApproveBase(updates);
+  }
+
+  /**
+   * Approves a single account update without requiring side-loaded proof verification.
+   * This function can only be used when dynamic proof verification is disabled in the updates configuration.
+   *
+   * @param accountUpdate - The account update to approve
+   * @throws {Error} If dynamic proof verification is enabled in the updates configuration
+   * @throws {Error} If the update involves the circulation account
+   * @throws {Error} If the update would result in flash minting
+   * @throws {Error} If the update would result in an unbalanced transaction
+   */
+  async approveAccountUpdateCustom(
+    accountUpdate: AccountUpdate | AccountUpdateTree
+  ) {
+    let forest = toForest([accountUpdate]);
+    await this.approveBaseCustom(forest);
+  }
+
+  /**
+   * Approves multiple account updates without requiring side-loaded proof verification.
+   * This function can only be used when dynamic proof verification is disabled in the updates configuration.
+   *
+   * @param accountUpdates - The account updates to approve
+   * @throws {Error} If dynamic proof verification is enabled in the updates configuration
+   * @throws {Error} If any update involves the circulation account
+   * @throws {Error} If the updates would result in flash minting
+   * @throws {Error} If the updates would result in an unbalanced transaction
+   */
+  async approveAccountUpdatesCustom(
+    accountUpdates: (AccountUpdate | AccountUpdateTree)[]
+  ) {
+    let forest = toForest(accountUpdates);
+    await this.approveBaseCustom(forest);
+  }
+
+  /**
+   * Approves a forest of account updates without requiring side-loaded proof verification.
+   * This function can only be used when dynamic proof verification is disabled in the updates configuration.
+   *
+   * @param updates - The forest of account updates to approve
+   * @throws {Error} If dynamic proof verification is enabled in the updates configuration
+   * @throws {Error} If any update involves the circulation account
+   * @throws {Error} If the updates would result in flash minting
+   * @throws {Error} If the updates would result in an unbalanced transaction
+   */
+  async approveBaseCustom(updates: AccountUpdateForest): Promise<void> {
+    const packedDynamicProofConfigs =
+      this.packedDynamicProofConfigs.getAndRequireEquals();
+    const updatesDynamicProofConfig = UpdatesDynamicProofConfig.unpack(
+      packedDynamicProofConfigs
+    );
+    updatesDynamicProofConfig.shouldVerify.assertFalse(
+      FungibleTokenErrors.noPermissionForSideloadDisabledOperation
+    );
+
+    this.internalApproveBase(updates);
+  }
+
+  /**
+   * Internal approve base implementation shared by both approveBaseCustom() and approveBaseCustomWithProof().
+   * Contains the core approval logic without proof verification.
+   */
+  private internalApproveBase(updates: AccountUpdateForest): void {
     let totalBalance = Int64.from(0);
     this.forEachUpdate(updates, (update, usesToken) => {
       // Make sure that the account permissions are not changed
@@ -458,41 +652,26 @@ class FungibleToken extends TokenContract {
       Int64.zero,
       FungibleTokenErrors.unbalancedTransaction
     );
-
-    const packedDynamicProofConfigs =
-      this.packedDynamicProofConfigs.getAndRequireEquals();
-    const updatesDynamicProofConfig = UpdatesDynamicProofConfig.unpack(
-      packedDynamicProofConfigs
-    );
-
-    await this.verifySideLoadedProof(
-      proof,
-      vk,
-      PublicKey.empty(),
-      updatesDynamicProofConfig,
-      vKeyMap,
-      OperationKeys.ApproveBase
-    );
   }
 
-  async approveAccountUpdateCustom(
+  async approveAccountUpdateCustomWithProof(
     accountUpdate: AccountUpdate | AccountUpdateTree,
     proof: SideloadedProof,
     vk: VerificationKey,
     vKeyMap: VKeyMerkleMap
   ) {
     let forest = toForest([accountUpdate]);
-    await this.approveBaseCustom(forest, proof, vk, vKeyMap);
+    await this.approveBaseCustomWithProof(forest, proof, vk, vKeyMap);
   }
 
-  async approveAccountUpdatesCustom(
+  async approveAccountUpdatesCustomWithProof(
     accountUpdates: (AccountUpdate | AccountUpdateTree)[],
     proof: SideloadedProof,
     vk: VerificationKey,
     vKeyMap: VKeyMerkleMap
   ) {
     let forest = toForest(accountUpdates);
-    await this.approveBaseCustom(forest, proof, vk, vKeyMap);
+    await this.approveBaseCustomWithProof(forest, proof, vk, vKeyMap);
   }
 
   @method.returns(UInt64)
