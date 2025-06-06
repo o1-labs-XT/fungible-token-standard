@@ -10,7 +10,10 @@ export {
   BurnDynamicProofConfig,
   TransferDynamicProofConfig,
   UpdatesDynamicProofConfig,
-  OperationKeys
+  OperationKeys,
+  EventTypes,
+  ParameterTypes,
+  FlagTypes,
 };
 
 /**
@@ -31,6 +34,46 @@ const OperationKeys = {
   Burn: Field(2),
   Transfer: Field(3),
   ApproveBase: Field(4),
+};
+
+/**
+ * `EventTypes` provides symbolic names for different types of events.
+ * Used in ConfigStructureUpdateEvent to distinguish between config and params updates.
+ *
+ * @property Config - Configuration structure updates (corresponds to Field(1)).
+ * @property Params - Parameter structure updates (corresponds to Field(2)).
+ */
+const EventTypes = {
+  Config: Field(1),
+  Params: Field(2),
+};
+
+/**
+ * `ParameterTypes` provides symbolic names for different parameter types.
+ * Used in AmountValueUpdateEvent to identify which parameter was updated.
+ *
+ * @property FixedAmount - Fixed amount parameter (corresponds to Field(1)).
+ * @property MinAmount - Minimum amount parameter (corresponds to Field(2)).
+ * @property MaxAmount - Maximum amount parameter (corresponds to Field(3)).
+ */
+const ParameterTypes = {
+  FixedAmount: Field(1),
+  MinAmount: Field(2),
+  MaxAmount: Field(3),
+};
+
+/**
+ * `FlagTypes` provides symbolic names for different configuration flag types.
+ * Used in ConfigFlagUpdateEvent to identify which boolean flag was updated.
+ *
+ * @property FixedAmount - Fixed amount configuration flag (corresponds to Field(1)).
+ * @property RangedAmount - Ranged amount configuration flag (corresponds to Field(2)).
+ * @property Unauthorized - Unauthorized access configuration flag (corresponds to Field(3)).
+ */
+const FlagTypes = {
+  FixedAmount: Field(1),
+  RangedAmount: Field(2),
+  Unauthorized: Field(3),
 };
 
 /**
