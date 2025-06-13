@@ -22,7 +22,7 @@ import {
   PrivateKey,
   UInt8,
 } from 'o1js';
-import { FungibleToken, VKeyMerkleMap } from '../FungibleTokenStandard.js';
+import { FungibleToken, VKeyMerkleMap } from '../FungibleTokenContract.js';
 import {
   generateDummyDynamicProof,
   SideloadedProof,
@@ -204,7 +204,7 @@ const deployFtTx = await Mina.transaction(
     AccountUpdate.fundNewAccount(deployer, 2);
     await fungibleToken.deploy({
       symbol: 'TKN',
-      src: 'https://github.com/o1-labs-XT/fungible-token-standard/blob/main/src/NewTokenStandard.ts',
+      src: 'https://github.com/o1-labs-XT/fungible-token-contract/blob/main/src/FungibleTokenContract.ts',
     });
     // Initialize FungibleToken with TokenManager as admin to have it as the token owner.
     await fungibleToken.initialize(

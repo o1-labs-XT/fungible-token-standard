@@ -13,7 +13,7 @@ import {
   FungibleToken,
   FungibleTokenErrors,
   VKeyMerkleMap,
-} from '../FungibleTokenStandard.js';
+} from '../FungibleTokenContract.js';
 import {
   MintConfig,
   MintParams,

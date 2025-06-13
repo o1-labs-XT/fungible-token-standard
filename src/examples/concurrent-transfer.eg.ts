@@ -7,7 +7,7 @@ import {
   UInt8,
   VerificationKey,
 } from 'o1js';
-import { FungibleToken, VKeyMerkleMap } from '../FungibleTokenStandard.js';
+import { FungibleToken, VKeyMerkleMap } from '../FungibleTokenContract.js';
 import {
   MintConfig,
   MintParams,
@@ -65,11 +65,7 @@ async function sendNoWait(
       if (payCreationFee) {
         AccountUpdate.fundNewAccount(feepayer.publicKey, 1);
       }
-      await token.transferCustom(
-        from.publicKey,
-        to,
-        new UInt64(amount),
-      );
+      await token.transferCustom(from.publicKey, to, new UInt64(amount));
     }
   );
   await transferTx.prove();
@@ -132,7 +128,7 @@ const deployTx = await Mina.transaction(
     AccountUpdate.fundNewAccount(feepayer.publicKey, 2);
     await token.deploy({
       symbol: 'DNB',
-      src: 'https://github.com/o1-labs-XT/fungible-token-standard/blob/main/src/NewTokenStandard.ts',
+      src: 'https://github.com/o1-labs-XT/fungible-token-contract/blob/main/src/FungibleTokenContract.ts',
     });
     await token.initialize(
       admin.publicKey,
@@ -161,10 +157,7 @@ const mintTx = await Mina.transaction(
   },
   async () => {
     AccountUpdate.fundNewAccount(feepayer.publicKey, 2);
-    await token.mint(
-      alexa.publicKey,
-      new UInt64(100e9),
-    );
+    await token.mint(alexa.publicKey, new UInt64(100e9));
   }
 );
 await mintTx.prove();
@@ -184,7 +177,7 @@ const transferTx1 = await Mina.transaction(
     await token.transferCustom(
       alexa.publicKey,
       billy.publicKey,
-      new UInt64(5e9),
+      new UInt64(5e9)
     );
   }
 );

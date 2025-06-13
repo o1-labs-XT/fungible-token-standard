@@ -1,5 +1,5 @@
 import { AccountUpdate, Mina, PrivateKey, UInt8, UInt64 } from 'o1js';
-import { FungibleToken, VKeyMerkleMap } from '../FungibleTokenStandard.js';
+import { FungibleToken, VKeyMerkleMap } from '../FungibleTokenContract.js';
 import { VerificationKey } from 'o1js';
 import {
   generateDummyDynamicProof,
@@ -49,7 +49,7 @@ const deployTx = await Mina.transaction(
 
     await token.deploy({
       symbol: 'DNB',
-      src: 'https://github.com/o1-labs-XT/fungible-token-standard/blob/main/src/NewTokenStandard.ts',
+      src: 'https://github.com/o1-labs-XT/fungible-token-contract/blob/main/src/FungibleTokenContract.ts',
     });
 
     await token.initialize(
@@ -105,11 +105,7 @@ equal(alexaBalanceBeforeMint, 0n);
 console.log('Transferring tokens from Alexa to Billy');
 const transferTx = await Mina.transaction({ sender: alexa, fee }, async () => {
   AccountUpdate.fundNewAccount(alexa, 1);
-  await token.transferCustom(
-    alexa,
-    billy,
-    mintParams.maxAmount,
-  );
+  await token.transferCustom(alexa, billy, mintParams.maxAmount);
 });
 
 await transferTx.prove();
@@ -128,10 +124,7 @@ equal(billyBalanceAfterTransfer, mintParams.maxAmount.toBigInt());
 
 console.log("Burning Billy's tokens");
 const burnTx = await Mina.transaction({ sender: billy, fee }, async () => {
-  await token.burn(
-    billy,
-    burnParams.fixedAmount,
-  );
+  await token.burn(billy, burnParams.fixedAmount);
 });
 await burnTx.prove();
 burnTx.sign([billy.key]);

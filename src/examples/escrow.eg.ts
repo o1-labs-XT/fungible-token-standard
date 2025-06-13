@@ -29,7 +29,7 @@ import {
   generateDummyDynamicProof,
   SideloadedProof,
 } from '../side-loaded/program.eg.js';
-import { FungibleToken, VKeyMerkleMap } from '../FungibleTokenStandard.js';
+import { FungibleToken, VKeyMerkleMap } from '../FungibleTokenContract.js';
 
 export class TokenEscrow extends SmartContract {
   @state(PublicKey)
@@ -71,11 +71,7 @@ export class TokenEscrow extends SmartContract {
     const senderUpdate = AccountUpdate.createSigned(sender);
     senderUpdate.body.useFullCommitment = Bool(true);
     this.sender.getAndRequireSignature;
-    await token.transferCustom(
-      sender,
-      this.address,
-      amount,
-    );
+    await token.transferCustom(sender, this.address, amount);
 
     const total = this.total.getAndRequireEquals();
     this.total.set(total.add(amount));
@@ -162,7 +158,7 @@ const deployTx = await Mina.transaction(
 
     await tokenContract.deploy({
       symbol: 'DNB',
-      src: 'https://github.com/o1-labs-XT/fungible-token-standard/blob/main/src/NewTokenStandard.ts',
+      src: 'https://github.com/o1-labs-XT/fungible-token-contract/blob/main/src/FungibleTokenContract.ts',
     });
 
     await tokenContract.initialize(
@@ -202,9 +198,7 @@ const deployEscrowTx = await Mina.transaction(
       owner,
     });
 
-    await tokenContract.approveAccountUpdateCustom(
-      escrowContract.self,
-    );
+    await tokenContract.approveAccountUpdateCustom(escrowContract.self);
   }
 );
 
@@ -226,10 +220,7 @@ const mintAlexaTx = await Mina.transaction(
   { sender: deployer, fee },
   async () => {
     AccountUpdate.fundNewAccount(deployer, 1);
-    await tokenContract.mint(
-      alexa,
-      mintParams.maxAmount,
-    );
+    await tokenContract.mint(alexa, mintParams.maxAmount);
   }
 );
 await mintAlexaTx.prove();
@@ -243,10 +234,7 @@ const mintBillyTx = await Mina.transaction(
   { sender: deployer, fee },
   async () => {
     AccountUpdate.fundNewAccount(deployer, 1);
-    await tokenContract.mint(
-      billy,
-      mintParams.maxAmount,
-    );
+    await tokenContract.mint(billy, mintParams.maxAmount);
   }
 );
 await mintBillyTx.prove();
@@ -268,9 +256,7 @@ const depositTx1 = await Mina.transaction(
       dummyVkey,
       vKeyMap
     );
-    await tokenContract.approveAccountUpdateCustom(
-      escrowContract.self,
-    );
+    await tokenContract.approveAccountUpdateCustom(escrowContract.self);
   }
 );
 await depositTx1.prove();
@@ -298,9 +284,7 @@ const depositTx2 = await Mina.transaction(
       dummyVkey,
       vKeyMap
     );
-    await tokenContract.approveAccountUpdateCustom(
-      escrowContract.self,
-    );
+    await tokenContract.approveAccountUpdateCustom(escrowContract.self);
   }
 );
 await depositTx2.prove();
@@ -327,9 +311,7 @@ const withdrawTx = await Mina.transaction(
   async () => {
     AccountUpdate.fundNewAccount(owner, 1);
     await escrowContract.withdraw(jackie, new UInt64(25));
-    await tokenContract.approveAccountUpdateCustom(
-      escrowContract.self,
-    );
+    await tokenContract.approveAccountUpdateCustom(escrowContract.self);
   }
 );
 await withdrawTx.prove();
@@ -356,7 +338,7 @@ const directWithdrawTx = await Mina.transaction(
     await tokenContract.transferCustom(
       escrowContractKeyPair.publicKey,
       jackie,
-      new UInt64(10),
+      new UInt64(10)
     );
   }
 );
