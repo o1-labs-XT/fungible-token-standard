@@ -850,92 +850,70 @@ class FungibleToken extends TokenContract {
   }
 
   @method
-  async updateMintDynamicProofConfig(
-    mintDynamicProofConfig: MintDynamicProofConfig
+  async updateDynamicProofConfig(
+    operationType: Field,
+    config: DynamicProofConfig
   ) {
-    //! maybe enforce more restriction
     this.ensureAdminSignature(Bool(true));
+
+    const isMint = operationType.equals(OperationKeys.Mint);
+    const isBurn = operationType.equals(OperationKeys.Burn);
+    const isTransfer = operationType.equals(OperationKeys.Transfer);
+    const isApproveBase = operationType.equals(OperationKeys.ApproveBase);
+
+    // Ensure operationType is valid
+    isMint
+      .or(isBurn)
+      .or(isTransfer)
+      .or(isApproveBase)
+      .assertTrue(
+        'Invalid operation type: must be Mint, Burn, Transfer, or ApproveBase'
+      );
+
     const packedDynamicProofConfigs =
       this.packedDynamicProofConfigs.getAndRequireEquals();
 
-    const newPackedConfig = mintDynamicProofConfig.updatePackedConfigs(
-      packedDynamicProofConfigs
+    // Update the packed configs based on operation type
+    // Each config occupies 7 bits: Mint(0-6), Burn(7-13), Transfer(14-20), ApproveBase(21-27)
+    const allBits = packedDynamicProofConfigs.toBits(28);
+    const configBits = config.toBits();
+
+    // Create updated configurations for each operation type
+    const mintUpdatedField = Field.fromBits([
+      ...configBits,
+      ...allBits.slice(7, 28),
+    ]);
+    const burnUpdatedField = Field.fromBits([
+      ...allBits.slice(0, 7),
+      ...configBits,
+      ...allBits.slice(14, 28),
+    ]);
+    const transferUpdatedField = Field.fromBits([
+      ...allBits.slice(0, 14),
+      ...configBits,
+      ...allBits.slice(21, 28),
+    ]);
+    const approveUpdatedField = Field.fromBits([
+      ...allBits.slice(0, 21),
+      ...configBits,
+    ]);
+
+    const newPackedConfig = Provable.switch(
+      [isMint, isBurn, isTransfer, isApproveBase],
+      Field,
+      [
+        mintUpdatedField,
+        burnUpdatedField,
+        transferUpdatedField,
+        approveUpdatedField,
+      ]
     );
     this.packedDynamicProofConfigs.set(newPackedConfig);
 
     this.emitEvent(
       'DynamicProofConfigUpdate',
       new DynamicProofConfigUpdateEvent({
-        operationType: OperationKeys.Mint,
-        newConfig: newPackedConfig,
-      })
-    );
-  }
-
-  @method
-  async updateBurnDynamicProofConfig(
-    burnDynamicProofConfig: BurnDynamicProofConfig
-  ) {
-    //! maybe enforce more restriction
-    this.ensureAdminSignature(Bool(true));
-    const packedDynamicProofConfigs =
-      this.packedDynamicProofConfigs.getAndRequireEquals();
-
-    const newPackedConfig = burnDynamicProofConfig.updatePackedConfigs(
-      packedDynamicProofConfigs
-    );
-    this.packedDynamicProofConfigs.set(newPackedConfig);
-
-    this.emitEvent(
-      'DynamicProofConfigUpdate',
-      new DynamicProofConfigUpdateEvent({
-        operationType: OperationKeys.Burn,
-        newConfig: newPackedConfig,
-      })
-    );
-  }
-
-  @method
-  async updateTransferDynamicProofConfig(
-    transferDynamicProofConfig: TransferDynamicProofConfig
-  ) {
-    //! maybe enforce more restriction
-    this.ensureAdminSignature(Bool(true));
-    const packedDynamicProofConfigs =
-      this.packedDynamicProofConfigs.getAndRequireEquals();
-
-    const newPackedConfig = transferDynamicProofConfig.updatePackedConfigs(
-      packedDynamicProofConfigs
-    );
-    this.packedDynamicProofConfigs.set(newPackedConfig);
-
-    this.emitEvent(
-      'DynamicProofConfigUpdate',
-      new DynamicProofConfigUpdateEvent({
-        operationType: OperationKeys.Transfer,
-        newConfig: newPackedConfig,
-      })
-    );
-  }
-
-  @method
-  async updateUpdatesDynamicProofConfig(
-    updatesDynamicProofConfig: UpdatesDynamicProofConfig
-  ) {
-    //! maybe enforce more restriction
-    this.ensureAdminSignature(Bool(true));
-    const packedDynamicProofConfigs =
-      this.packedDynamicProofConfigs.getAndRequireEquals();
-
-    const newPackedConfig = updatesDynamicProofConfig.updatePackedConfigs(
-      packedDynamicProofConfigs
-    );
-    this.packedDynamicProofConfigs.set(newPackedConfig);
-
-    this.emitEvent(
-      'DynamicProofConfigUpdate',
-      new DynamicProofConfigUpdateEvent({
-        operationType: OperationKeys.ApproveBase,
+        operationType,
         newConfig: newPackedConfig,
       })
     );
@@ -1138,102 +1116,72 @@ class FungibleToken extends TokenContract {
   }
 
   @method
-  async updateMintFixedAmount(value: UInt64) {
+  async updateAmountParameter(
+    operationType: Field,
+    parameterType: Field,
+    value: UInt64
+  ) {
     this.ensureAdminSignature(Bool(true));
+
+    const isMint = operationType.equals(OperationKeys.Mint);
+    const isBurn = operationType.equals(OperationKeys.Burn);
+
+    // Ensure operationType is either Mint or Burn
+    isMint
+      .or(isBurn)
+      .assertTrue('Invalid operation type: must be Mint or Burn');
+
+    // Get packed params based on operation type
     const packedMintParams = this.packedMintParams.getAndRequireEquals();
-    const params = MintParams.unpack(packedMintParams);
-    const oldValue = params.fixedAmount;
-    params.fixedAmount = value;
-    this.packedMintParams.set(params.pack());
-
-    this.emitEvent(
-      'AmountValueUpdate',
-      new AmountValueUpdateEvent({
-        parameterType: ParameterTypes.FixedAmount,
-        category: OperationKeys.Mint,
-        oldValue,
-        newValue: value,
-      })
-    );
-  }
-
-  @method
-  async updateMintMinAmount(value: UInt64) {
-    this.ensureAdminSignature(Bool(true));
-    const packedMintParams = this.packedMintParams.getAndRequireEquals();
-    const params = MintParams.unpack(packedMintParams);
-    const oldValue = params.minAmount;
-    params.minAmount = value;
-    params.validate();
-    this.packedMintParams.set(params.pack());
-
-    this.emitEvent(
-      'AmountValueUpdate',
-      new AmountValueUpdateEvent({
-        parameterType: ParameterTypes.MinAmount,
-        category: OperationKeys.Mint,
-        oldValue,
-        newValue: value,
-      })
-    );
-  }
-
-  @method
-  async updateMintMaxAmount(value: UInt64) {
-    this.ensureAdminSignature(Bool(true));
-    const packedMintParams = this.packedMintParams.getAndRequireEquals();
-    const params = MintParams.unpack(packedMintParams);
-    const oldValue = params.maxAmount;
-    params.maxAmount = value;
-    params.validate();
-    this.packedMintParams.set(params.pack());
-
-    this.emitEvent(
-      'AmountValueUpdate',
-      new AmountValueUpdateEvent({
-        parameterType: ParameterTypes.MaxAmount,
-        category: OperationKeys.Mint,
-        oldValue,
-        newValue: value,
-      })
-    );
-  }
-
-  @method
-  async updateBurnFixedAmount(value: UInt64) {
-    this.ensureAdminSignature(Bool(true));
     const packedBurnParams = this.packedBurnParams.getAndRequireEquals();
-    const params = BurnParams.unpack(packedBurnParams);
-    const oldValue = params.fixedAmount;
-    params.fixedAmount = value;
-    this.packedBurnParams.set(params.pack());
 
-    this.emitEvent(
-      'AmountValueUpdate',
-      new AmountValueUpdateEvent({
-        parameterType: ParameterTypes.FixedAmount,
-        category: OperationKeys.Burn,
-        oldValue,
-        newValue: value,
-      })
+    const packedParams = Provable.if(
+      isMint,
+      packedMintParams,
+      packedBurnParams
     );
-  }
 
-  @method
-  async updateBurnMinAmount(value: UInt64) {
-    this.ensureAdminSignature(Bool(true));
-    const packedBurnParams = this.packedBurnParams.getAndRequireEquals();
-    const params = BurnParams.unpack(packedBurnParams);
-    const oldValue = params.minAmount;
-    params.minAmount = value;
+    // Unpack params (both use same structure for `.unpack()`, extended from `AmountParams` object)
+    const params = MintParams.unpack(packedParams);
+
+    const isFixedAmount = parameterType.equals(ParameterTypes.FixedAmount);
+    const isMinAmount = parameterType.equals(ParameterTypes.MinAmount);
+    const isMaxAmount = parameterType.equals(ParameterTypes.MaxAmount);
+
+    // Ensure parameterType is valid
+    isFixedAmount
+      .or(isMinAmount)
+      .or(isMaxAmount)
+      .assertTrue(
+        'Invalid parameter type: must be FixedAmount, MinAmount, or MaxAmount'
+      );
+
+    const oldValue = Provable.switch(
+      [isFixedAmount, isMinAmount, isMaxAmount],
+      UInt64,
+      [params.fixedAmount, params.minAmount, params.maxAmount]
+    );
+
+    params.fixedAmount = Provable.if(isFixedAmount, value, params.fixedAmount);
+    params.minAmount = Provable.if(isMinAmount, value, params.minAmount);
+    params.maxAmount = Provable.if(isMaxAmount, value, params.maxAmount);
+
     params.validate();
-    this.packedBurnParams.set(params.pack());
+
+    // Set packed params based on operation type
+    const newPackedParams = params.pack();
+    this.packedMintParams.set(
+      Provable.if(isMint, newPackedParams, packedMintParams)
+    );
+    this.packedBurnParams.set(
+      Provable.if(isBurn, newPackedParams, packedBurnParams)
+    );
 
     this.emitEvent(
       'AmountValueUpdate',
       new AmountValueUpdateEvent({
-        parameterType: ParameterTypes.MinAmount,
-        category: OperationKeys.Burn,
+        parameterType,
+        category: operationType,
         oldValue,
         newValue: value,
       })
@@ -1241,152 +1189,137 @@ class FungibleToken extends TokenContract {
   }
 
   @method
-  async updateBurnMaxAmount(value: UInt64) {
-    this.ensureAdminSignature(Bool(true));
-    const packedBurnParams = this.packedBurnParams.getAndRequireEquals();
-    const params = BurnParams.unpack(packedBurnParams);
-    const oldValue = params.maxAmount;
-    params.maxAmount = value;
-    params.validate();
-    this.packedBurnParams.set(params.pack());
-
-    this.emitEvent(
-      'AmountValueUpdate',
-      new AmountValueUpdateEvent({
-        parameterType: ParameterTypes.MaxAmount,
-        category: OperationKeys.Burn,
-        oldValue,
-        newValue: value,
-      })
-    );
-  }
-
-  @method
-  async updateMintFixedAmountConfig(value: Bool) {
+  async updateConfigFlag(operationType: Field, flagType: Field, value: Bool) {
     this.ensureAdminSignature(Bool(true));
     const packedConfigs = this.packedAmountConfigs.getAndRequireEquals();
-    const config = MintConfig.unpack(packedConfigs);
-    const oldValue = config.fixedAmount;
-    config.fixedAmount = value;
-    config.rangedAmount = value.not();
-    config.validate();
-    this.packedAmountConfigs.set(config.updatePackedConfigs(packedConfigs));
 
-    this.emitEvent(
+    const isMint = operationType.equals(OperationKeys.Mint);
+    const isBurn = operationType.equals(OperationKeys.Burn);
+
+    // Ensure operationType is either Mint or Burn
+    isMint
+      .or(isBurn)
+      .assertTrue('Invalid operation type: must be Mint or Burn');
+
+    const isFixedAmount = flagType.equals(FlagTypes.FixedAmount);
+    const isRangedAmount = flagType.equals(FlagTypes.RangedAmount);
+    const isUnauthorized = flagType.equals(FlagTypes.Unauthorized);
+
+    // Ensure flagType is valid
+    isFixedAmount
+      .or(isRangedAmount)
+      .or(isUnauthorized)
+      .assertTrue(
+        'Invalid flag type: must be FixedAmount, RangedAmount, or Unauthorized'
+      );
+
+    // Get the bits for both configs
+    const allBits = packedConfigs.toBits(6);
+    const mintBits = allBits.slice(0, 3);
+    const burnBits = allBits.slice(3, 6);
+
+    // Get the config we're updating based on operation type
+    const configBits = [
+      Provable.if(isMint, mintBits[0], burnBits[0]),
+      Provable.if(isMint, mintBits[1], burnBits[1]),
+      Provable.if(isMint, mintBits[2], burnBits[2]),
+    ];
+    const [unauthorized, fixedAmount, rangedAmount] = configBits;
+
+    // Store original values
+    const originalFixedAmount = fixedAmount;
+    const originalRangedAmount = rangedAmount;
+    const originalUnauthorized = unauthorized;
+
+    // Update the specified flag
+    const newFixedAmount = Provable.if(
+      isFixedAmount,
+      value,
+      originalFixedAmount
+    );
+    const newRangedAmount = Provable.if(
+      isRangedAmount,
+      value,
+      originalRangedAmount
+    );
+    const newUnauthorized = Provable.if(
+      isUnauthorized,
+      value,
+      originalUnauthorized
+    );
+
+    // Handle mutual exclusivity for fixed/ranged amount
+    const finalFixedAmount = Provable.if(
+      isRangedAmount,
+      value.not(),
+      newFixedAmount
+    );
+    const finalRangedAmount = Provable.if(
+      isFixedAmount,
+      value.not(),
+      newRangedAmount
+    );
+
+    // Create new config bits
+    const updatedConfigBits = [
+      newUnauthorized,
+      finalFixedAmount,
+      finalRangedAmount,
+    ];
+
+    // Update the packed configs based on operation type
+    const updatedPackedConfigs = Field.fromBits([
+      Provable.if(isMint, updatedConfigBits[0], mintBits[0]),
+      Provable.if(isMint, updatedConfigBits[1], mintBits[1]),
+      Provable.if(isMint, updatedConfigBits[2], mintBits[2]),
+      Provable.if(isBurn, updatedConfigBits[0], burnBits[0]),
+      Provable.if(isBurn, updatedConfigBits[1], burnBits[1]),
+      Provable.if(isBurn, updatedConfigBits[2], burnBits[2]),
+    ]);
+
+    this.packedAmountConfigs.set(updatedPackedConfigs);
+
+    // Emit an event only for flags that actually changed
+    const fixedAmountChanged = finalFixedAmount
+      .equals(originalFixedAmount)
+      .not();
+    const rangedAmountChanged = finalRangedAmount
+      .equals(originalRangedAmount)
+      .not();
+    const unauthorizedChanged = newUnauthorized
+      .equals(originalUnauthorized)
+      .not();
+
+    this.emitEventIf(
+      fixedAmountChanged,
       'ConfigFlagUpdate',
       new ConfigFlagUpdateEvent({
         flagType: FlagTypes.FixedAmount,
-        category: OperationKeys.Mint,
-        oldValue,
-        newValue: value,
+        category: operationType,
+        oldValue: originalFixedAmount,
+        newValue: finalFixedAmount,
       })
     );
-  }
 
-  @method
-  async updateMintRangedAmountConfig(value: Bool) {
-    this.ensureAdminSignature(Bool(true));
-    const packedConfigs = this.packedAmountConfigs.getAndRequireEquals();
-    const config = MintConfig.unpack(packedConfigs);
-    const oldValue = config.rangedAmount;
-    config.rangedAmount = value;
-    config.fixedAmount = value.not();
-    config.validate();
-    this.packedAmountConfigs.set(config.updatePackedConfigs(packedConfigs));
-
-    this.emitEvent(
+    this.emitEventIf(
+      rangedAmountChanged,
       'ConfigFlagUpdate',
       new ConfigFlagUpdateEvent({
         flagType: FlagTypes.RangedAmount,
-        category: OperationKeys.Mint,
-        oldValue,
-        newValue: value,
+        category: operationType,
+        oldValue: originalRangedAmount,
+        newValue: finalRangedAmount,
       })
     );
-  }
 
-  @method
-  async updateMintUnauthorizedConfig(value: Bool) {
-    this.ensureAdminSignature(Bool(true));
-    const packedConfigs = this.packedAmountConfigs.getAndRequireEquals();
-    const config = MintConfig.unpack(packedConfigs);
-    const oldValue = config.unauthorized;
-    config.unauthorized = value;
-    config.validate();
-    this.packedAmountConfigs.set(config.updatePackedConfigs(packedConfigs));
-
-    this.emitEvent(
+    this.emitEventIf(
+      unauthorizedChanged,
       'ConfigFlagUpdate',
       new ConfigFlagUpdateEvent({
         flagType: FlagTypes.Unauthorized,
-        category: OperationKeys.Mint,
-        oldValue,
-        newValue: value,
-      })
-    );
-  }
-
-  @method
-  async updateBurnFixedAmountConfig(value: Bool) {
-    this.ensureAdminSignature(Bool(true));
-    const packedConfigs = this.packedAmountConfigs.getAndRequireEquals();
-    const config = BurnConfig.unpack(packedConfigs);
-    const oldValue = config.fixedAmount;
-    config.fixedAmount = value;
-    config.rangedAmount = value.not();
-    config.validate();
-    this.packedAmountConfigs.set(config.updatePackedConfigs(packedConfigs));
-
-    this.emitEvent(
-      'ConfigFlagUpdate',
-      new ConfigFlagUpdateEvent({
-        flagType: FlagTypes.FixedAmount,
-        category: OperationKeys.Burn,
-        oldValue,
-        newValue: value,
-      })
-    );
-  }
-
-  @method
-  async updateBurnRangedAmountConfig(value: Bool) {
-    this.ensureAdminSignature(Bool(true));
-    const packedConfigs = this.packedAmountConfigs.getAndRequireEquals();
-    const config = BurnConfig.unpack(packedConfigs);
-    const oldValue = config.rangedAmount;
-    config.rangedAmount = value;
-    config.fixedAmount = value.not();
-    config.validate();
-    this.packedAmountConfigs.set(config.updatePackedConfigs(packedConfigs));
-
-    this.emitEvent(
-      'ConfigFlagUpdate',
-      new ConfigFlagUpdateEvent({
-        flagType: FlagTypes.RangedAmount,
-        category: OperationKeys.Burn,
-        oldValue,
-        newValue: value,
-      })
-    );
-  }
-
-  @method
-  async updateBurnUnauthorizedConfig(value: Bool) {
-    this.ensureAdminSignature(Bool(true));
-    const packedConfigs = this.packedAmountConfigs.getAndRequireEquals();
-    const config = BurnConfig.unpack(packedConfigs);
-    const oldValue = config.unauthorized;
-    config.unauthorized = value;
-    config.validate();
-    this.packedAmountConfigs.set(config.updatePackedConfigs(packedConfigs));
-
-    this.emitEvent(
-      'ConfigFlagUpdate',
-      new ConfigFlagUpdateEvent({
-        flagType: FlagTypes.Unauthorized,
-        category: OperationKeys.Burn,
-        oldValue,
-        newValue: value,
+        category: operationType,
+        oldValue: originalUnauthorized,
+        newValue: newUnauthorized,
       })
     );
   }

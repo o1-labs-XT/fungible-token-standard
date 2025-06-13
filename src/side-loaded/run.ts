@@ -169,7 +169,10 @@ mintDynamicProofConfig.shouldVerify = Bool(true);
 const updateMintDynamicProofConfigTx = await Mina.transaction(
   { sender: alexa, fee },
   async () => {
-    await token.updateMintDynamicProofConfig(mintDynamicProofConfig);
+    await token.updateDynamicProofConfig(
+      OperationKeys.Mint,
+      mintDynamicProofConfig
+    );
   }
 );
 await updateMintDynamicProofConfigTx.prove();
@@ -252,7 +255,10 @@ const updateDynamicProofConfigTx = await Mina.transaction(
     fee,
   },
   async () => {
-    await token.updateMintDynamicProofConfig(flexibleDynamicProofConfig);
+    await token.updateDynamicProofConfig(
+      OperationKeys.Mint,
+      flexibleDynamicProofConfig
+    );
   }
 );
 await updateDynamicProofConfigTx.prove();

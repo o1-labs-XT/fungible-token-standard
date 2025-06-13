@@ -25,6 +25,9 @@ import {
   UpdatesDynamicProofConfig,
   OperationKeys,
   ConfigErrors,
+  ParameterTypes,
+  FlagTypes,
+  DynamicProofConfig,
 } from '../configs.js';
 import {
   program,
@@ -191,13 +194,25 @@ describe('New Token Standard Burn Tests', () => {
       const tx = await Mina.transaction({ sender: user, fee }, async () => {
         switch (key) {
           case PARAMS_PROPERTIES.FIXED_AMOUNT:
-            await tokenContract.updateBurnFixedAmount(value);
+            await tokenContract.updateAmountParameter(
+              OperationKeys.Burn,
+              ParameterTypes.FixedAmount,
+              value
+            );
             break;
           case PARAMS_PROPERTIES.MIN_AMOUNT:
-            await tokenContract.updateBurnMinAmount(value);
+            await tokenContract.updateAmountParameter(
+              OperationKeys.Burn,
+              ParameterTypes.MinAmount,
+              value
+            );
             break;
           case PARAMS_PROPERTIES.MAX_AMOUNT:
-            await tokenContract.updateBurnMaxAmount(value);
+            await tokenContract.updateAmountParameter(
+              OperationKeys.Burn,
+              ParameterTypes.MaxAmount,
+              value
+            );
             break;
         }
       });
@@ -230,13 +245,25 @@ describe('New Token Standard Burn Tests', () => {
       const tx = await Mina.transaction({ sender: user, fee }, async () => {
         switch (key) {
           case CONFIG_PROPERTIES.FIXED_AMOUNT:
-            await tokenContract.updateBurnFixedAmountConfig(value);
+            await tokenContract.updateConfigFlag(
+              OperationKeys.Burn,
+              FlagTypes.FixedAmount,
+              value
+            );
             break;
           case CONFIG_PROPERTIES.RANGED_AMOUNT:
-            await tokenContract.updateBurnRangedAmountConfig(value);
+            await tokenContract.updateConfigFlag(
+              OperationKeys.Burn,
+              FlagTypes.RangedAmount,
+              value
+            );
             break;
           case CONFIG_PROPERTIES.UNAUTHORIZED:
-            await tokenContract.updateBurnUnauthorizedConfig(value);
+            await tokenContract.updateConfigFlag(
+              OperationKeys.Burn,
+              FlagTypes.Unauthorized,
+              value
+            );
             break;
         }
       });
@@ -246,6 +273,33 @@ describe('New Token Standard Burn Tests', () => {
       const packedConfigsAfter = tokenContract.packedAmountConfigs.get();
       const burnConfigAfter = BurnConfig.unpack(packedConfigsAfter);
       expect(burnConfigAfter[key]).toEqual(value);
+
+      if (expectedErrorMessage) {
+        throw new Error(
+          `Test should have failed with '${expectedErrorMessage}' but didnt!`
+        );
+      }
+    } catch (error: unknown) {
+      if (!expectedErrorMessage) throw error;
+      expect((error as Error).message).toContain(expectedErrorMessage);
+    }
+  }
+
+  async function updateBurnDynamicProofConfigTx(
+    user: PublicKey,
+    config: DynamicProofConfig,
+    signers: PrivateKey[],
+    expectedErrorMessage?: string
+  ) {
+    try {
+      const tx = await Mina.transaction({ sender: user, fee }, async () => {
+        await tokenContract.updateDynamicProofConfig(
+          OperationKeys.Burn,
+          config
+        );
+      });
+      await tx.prove();
+      await tx.sign(signers).send().wait();
 
       if (expectedErrorMessage) {
         throw new Error(
@@ -605,7 +659,6 @@ describe('New Token Standard Burn Tests', () => {
       const packedConfigsBefore = tokenContract.packedAmountConfigs.get();
       const burnConfigBefore = BurnConfig.unpack(packedConfigsBefore);
       const originalUnauthorized = burnConfigBefore.unauthorized;
-      const originalRangedAmount = burnConfigBefore.rangedAmount;
 
       const newFixedAmountValue = Bool(true);
       await updateBurnConfigPropertyTx(
@@ -1102,44 +1155,27 @@ describe('New Token Standard Burn Tests', () => {
 
   describe('Update Burn Dynamic Proof Config', () => {
     it('should reject burnDynamicProofConfig update when unauthorized by the admin', async () => {
-      try {
-        let burnDynamicProofConfig = BurnDynamicProofConfig.default;
-        burnDynamicProofConfig.shouldVerify = Bool(true);
+      let burnDynamicProofConfig = BurnDynamicProofConfig.default;
+      burnDynamicProofConfig.shouldVerify = Bool(true);
 
-        const updateBurnDynamicProofConfigTx = await Mina.transaction(
-          { sender: user2, fee },
-          async () => {
-            await tokenContract.updateBurnDynamicProofConfig(
-              burnDynamicProofConfig
-            );
-          }
-        );
-        await updateBurnDynamicProofConfigTx.prove();
-        await updateBurnDynamicProofConfigTx.sign([user2.key]).send().wait();
-      } catch (error: unknown) {
-        const expectedErrorMessage =
-          'the required authorization was not provided or is invalid';
-        expect((error as Error).message).toContain(expectedErrorMessage);
-      }
+      const expectedErrorMessage =
+        'the required authorization was not provided or is invalid';
+      await updateBurnDynamicProofConfigTx(
+        user2,
+        burnDynamicProofConfig,
+        [user2.key],
+        expectedErrorMessage
+      );
     });
 
     it('update burn dynamic proof config: enable side-loaded verification', async () => {
       let burnDynamicProofConfig = BurnDynamicProofConfig.default;
       burnDynamicProofConfig.shouldVerify = Bool(true);
 
-      const updateBurnDynamicProofConfigTx = await Mina.transaction(
-        { sender: user2, fee },
-        async () => {
-          await tokenContract.updateBurnDynamicProofConfig(
-            burnDynamicProofConfig
-          );
-        }
-      );
-      await updateBurnDynamicProofConfigTx.prove();
-      await updateBurnDynamicProofConfigTx
-        .sign([user2.key, tokenAdmin.key])
-        .send()
-        .wait();
+      await updateBurnDynamicProofConfigTx(user2, burnDynamicProofConfig, [
+        user2.key,
+        tokenAdmin.key,
+      ]);
     });
   });
 

@@ -25,6 +25,9 @@ import {
   UpdatesDynamicProofConfig,
   OperationKeys,
   ConfigErrors,
+  ParameterTypes,
+  FlagTypes,
+  DynamicProofConfig,
 } from '../configs.js';
 import {
   program,
@@ -252,13 +255,25 @@ describe('New Token Standard Mint Tests', () => {
       const tx = await Mina.transaction({ sender: user, fee }, async () => {
         switch (key) {
           case PARAMS_PROPERTIES.FIXED_AMOUNT:
-            await tokenContract.updateMintFixedAmount(value);
+            await tokenContract.updateAmountParameter(
+              OperationKeys.Mint,
+              ParameterTypes.FixedAmount,
+              value
+            );
             break;
           case PARAMS_PROPERTIES.MIN_AMOUNT:
-            await tokenContract.updateMintMinAmount(value);
+            await tokenContract.updateAmountParameter(
+              OperationKeys.Mint,
+              ParameterTypes.MinAmount,
+              value
+            );
             break;
           case PARAMS_PROPERTIES.MAX_AMOUNT:
-            await tokenContract.updateMintMaxAmount(value);
+            await tokenContract.updateAmountParameter(
+              OperationKeys.Mint,
+              ParameterTypes.MaxAmount,
+              value
+            );
             break;
         }
       });
@@ -291,13 +306,25 @@ describe('New Token Standard Mint Tests', () => {
       const tx = await Mina.transaction({ sender: user, fee }, async () => {
         switch (key) {
           case CONFIG_PROPERTIES.FIXED_AMOUNT:
-            await tokenContract.updateMintFixedAmountConfig(value);
+            await tokenContract.updateConfigFlag(
+              OperationKeys.Mint,
+              FlagTypes.FixedAmount,
+              value
+            );
             break;
           case CONFIG_PROPERTIES.RANGED_AMOUNT:
-            await tokenContract.updateMintRangedAmountConfig(value);
+            await tokenContract.updateConfigFlag(
+              OperationKeys.Mint,
+              FlagTypes.RangedAmount,
+              value
+            );
             break;
           case CONFIG_PROPERTIES.UNAUTHORIZED:
-            await tokenContract.updateMintUnauthorizedConfig(value);
+            await tokenContract.updateConfigFlag(
+              OperationKeys.Mint,
+              FlagTypes.Unauthorized,
+              value
+            );
             break;
         }
       });
@@ -374,174 +401,6 @@ describe('New Token Standard Mint Tests', () => {
       if (expectedErrorMessage)
         throw new Error('Test should have failed but didnt!');
     } catch (error: unknown) {
-      expect((error as Error).message).toContain(expectedErrorMessage);
-    }
-  }
-
-  async function updateMintFixedAmountTx(
-    user: PublicKey,
-    value: UInt64,
-    signers: PrivateKey[],
-    expectedErrorMessage?: string
-  ) {
-    try {
-      const tx = await Mina.transaction({ sender: user, fee }, async () => {
-        await tokenContract.updateMintFixedAmount(value);
-      });
-      await tx.prove();
-      await tx.sign(signers).send().wait();
-
-      const packedParams = tokenContract.packedMintParams.get();
-      const params = MintParams.unpack(packedParams);
-      expect(params.fixedAmount).toEqual(value);
-
-      if (expectedErrorMessage) {
-        throw new Error(
-          `Test should have failed with '${expectedErrorMessage}' but didnt!`
-        );
-      }
-    } catch (error: unknown) {
-      if (!expectedErrorMessage) throw error;
-      expect((error as Error).message).toContain(expectedErrorMessage);
-    }
-  }
-
-  async function updateMintMinAmountTx(
-    user: PublicKey,
-    value: UInt64,
-    signers: PrivateKey[],
-    expectedErrorMessage?: string
-  ) {
-    try {
-      const tx = await Mina.transaction({ sender: user, fee }, async () => {
-        await tokenContract.updateMintMinAmount(value);
-      });
-      await tx.prove();
-      await tx.sign(signers).send().wait();
-
-      const packedParams = tokenContract.packedMintParams.get();
-      const params = MintParams.unpack(packedParams);
-      expect(params.minAmount).toEqual(value);
-
-      if (expectedErrorMessage) {
-        throw new Error(
-          `Test should have failed with '${expectedErrorMessage}' but didnt!`
-        );
-      }
-    } catch (error: unknown) {
-      if (!expectedErrorMessage) throw error;
-      expect((error as Error).message).toContain(expectedErrorMessage);
-    }
-  }
-
-  async function updateMintMaxAmountTx(
-    user: PublicKey,
-    value: UInt64,
-    signers: PrivateKey[],
-    expectedErrorMessage?: string
-  ) {
-    try {
-      const tx = await Mina.transaction({ sender: user, fee }, async () => {
-        await tokenContract.updateMintMaxAmount(value);
-      });
-      await tx.prove();
-      await tx.sign(signers).send().wait();
-
-      const packedParams = tokenContract.packedMintParams.get();
-      const params = MintParams.unpack(packedParams);
-      expect(params.maxAmount).toEqual(value);
-
-      if (expectedErrorMessage) {
-        throw new Error(
-          `Test should have failed with '${expectedErrorMessage}' but didnt!`
-        );
-      }
-    } catch (error: unknown) {
-      if (!expectedErrorMessage) throw error;
-      expect((error as Error).message).toContain(expectedErrorMessage);
-    }
-  }
-
-  async function updateMintFixedAmountConfigTx(
-    user: PublicKey,
-    value: Bool,
-    signers: PrivateKey[],
-    expectedErrorMessage?: string
-  ) {
-    try {
-      const tx = await Mina.transaction({ sender: user, fee }, async () => {
-        await tokenContract.updateMintFixedAmountConfig(value);
-      });
-      await tx.prove();
-      await tx.sign(signers).send().wait();
-
-      const packedConfigsAfter = tokenContract.packedAmountConfigs.get();
-      const mintConfigAfter = MintConfig.unpack(packedConfigsAfter);
-      expect(mintConfigAfter.fixedAmount).toEqual(value);
-
-      if (expectedErrorMessage) {
-        throw new Error(
-          `Test should have failed with '${expectedErrorMessage}' but didnt!`
-        );
-      }
-    } catch (error: unknown) {
-      if (!expectedErrorMessage) throw error;
-      expect((error as Error).message).toContain(expectedErrorMessage);
-    }
-  }
-
-  async function updateMintRangedAmountConfigTx(
-    user: PublicKey,
-    value: Bool,
-    signers: PrivateKey[],
-    expectedErrorMessage?: string
-  ) {
-    try {
-      const tx = await Mina.transaction({ sender: user, fee }, async () => {
-        await tokenContract.updateMintRangedAmountConfig(value);
-      });
-      await tx.prove();
-      await tx.sign(signers).send().wait();
-
-      const packedConfigsAfter = tokenContract.packedAmountConfigs.get();
-      const mintConfigAfter = MintConfig.unpack(packedConfigsAfter);
-      expect(mintConfigAfter.rangedAmount).toEqual(value);
-
-      if (expectedErrorMessage) {
-        throw new Error(
-          `Test should have failed with '${expectedErrorMessage}' but didnt!`
-        );
-      }
-    } catch (error: unknown) {
-      if (!expectedErrorMessage) throw error;
-      expect((error as Error).message).toContain(expectedErrorMessage);
-    }
-  }
-
-  async function updateMintUnauthorizedConfigTx(
-    user: PublicKey,
-    value: Bool,
-    signers: PrivateKey[],
-    expectedErrorMessage?: string
-  ) {
-    try {
-      const tx = await Mina.transaction({ sender: user, fee }, async () => {
-        await tokenContract.updateMintUnauthorizedConfig(value);
-      });
-      await tx.prove();
-      await tx.sign(signers).send().wait();
-
-      const packedConfigsAfter = tokenContract.packedAmountConfigs.get();
-      const mintConfigAfter = MintConfig.unpack(packedConfigsAfter);
-      expect(mintConfigAfter.unauthorized).toEqual(value);
-
-      if (expectedErrorMessage) {
-        throw new Error(
-          `Test should have failed with '${expectedErrorMessage}' but didnt!`
-        );
-      }
-    } catch (error: unknown) {
-      if (!expectedErrorMessage) throw error;
       expect((error as Error).message).toContain(expectedErrorMessage);
     }
   }
@@ -1340,7 +1199,8 @@ describe('New Token Standard Mint Tests', () => {
         const updateMintDynamicProofConfigTx = await Mina.transaction(
           { sender: user2, fee },
           async () => {
-            await tokenContract.updateMintDynamicProofConfig(
+            await tokenContract.updateDynamicProofConfig(
+              OperationKeys.Mint,
               mintDynamicProofConfig
             );
           }
@@ -1361,7 +1221,8 @@ describe('New Token Standard Mint Tests', () => {
       const updateMintDynamicProofConfigTx = await Mina.transaction(
         { sender: user2, fee },
         async () => {
-          await tokenContract.updateMintDynamicProofConfig(
+          await tokenContract.updateDynamicProofConfig(
+            OperationKeys.Mint,
             mintDynamicProofConfig
           );
         }
