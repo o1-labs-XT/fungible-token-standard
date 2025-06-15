@@ -1,5 +1,5 @@
 import { AccountUpdate, Mina, PrivateKey, UInt8, UInt64, Bool } from 'o1js';
-import { FungibleToken } from '../FungibleTokenStandard.js';
+import { FungibleToken } from '../FungibleTokenContract.js';
 import {
   MintConfig,
   MintParams,
@@ -62,7 +62,7 @@ const deployTx = await Mina.transaction({ sender: deployer, fee }, async () => {
 
   await token.deploy({
     symbol: 'DNB',
-    src: 'https://github.com/o1-labs-XT/fungible-token-standard/blob/main/src/NewTokenStandard.ts',
+    src: 'https://github.com/o1-labs-XT/fungible-token-contract/blob/main/src/FungibleTokenContract.ts',
   });
 
   await token.initialize(

@@ -25,7 +25,7 @@ import {
   TransferDynamicProofConfig,
   UpdatesDynamicProofConfig,
 } from '../configs.js';
-import { FungibleToken } from '../FungibleTokenStandard.js';
+import { FungibleToken } from '../FungibleTokenContract.js';
 
 export class TokenEscrow extends SmartContract {
   @state(PublicKey)
@@ -132,7 +132,7 @@ const deployTx = await Mina.transaction(
 
     await tokenContract.deploy({
       symbol: 'DNB',
-      src: 'https://github.com/o1-labs-XT/fungible-token-standard/blob/main/src/NewTokenStandard.ts',
+      src: 'https://github.com/o1-labs-XT/fungible-token-contract/blob/main/src/FungibleTokenContract.ts',
     });
 
     await tokenContract.initialize(

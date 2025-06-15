@@ -21,7 +21,7 @@ import {
   PrivateKey,
   UInt8,
 } from 'o1js';
-import { FungibleToken } from '../FungibleTokenStandard.js';
+import { FungibleToken } from '../FungibleTokenContract.js';
 import {
   BurnConfig,
   BurnDynamicProofConfig,
@@ -177,7 +177,7 @@ const deployTx = await Mina.transaction(
     AccountUpdate.fundNewAccount(deployer, 2);
     await tokenContract.deploy({
       symbol: 'TKN',
-      src: 'https://github.com/o1-labs-XT/fungible-token-standard/blob/main/src/NewTokenStandard.ts',
+      src: 'https://github.com/o1-labs-XT/fungible-token-contract/blob/main/src/FungibleTokenContract.ts',
     });
 
     await tokenContract.initialize(

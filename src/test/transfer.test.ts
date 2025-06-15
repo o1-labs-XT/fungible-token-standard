@@ -13,7 +13,7 @@ import {
   FungibleToken,
   FungibleTokenErrors,
   VKeyMerkleMap,
-} from '../FungibleTokenStandard.js';
+} from '../FungibleTokenContract.js';
 import {
   MintConfig,
   MintParams,
@@ -238,7 +238,7 @@ describe('New Token Standard Transfer Tests', () => {
 
         await tokenContract.deploy({
           symbol: 'tokA',
-          src: 'https://github.com/o1-labs-XT/fungible-token-standard',
+          src: 'https://github.com/o1-labs-XT/fungible-token-contract',
         });
       });
 
