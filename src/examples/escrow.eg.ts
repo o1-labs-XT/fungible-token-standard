@@ -25,11 +25,7 @@ import {
   TransferDynamicProofConfig,
   UpdatesDynamicProofConfig,
 } from '../configs.js';
-import {
-  generateDummyDynamicProof,
-  SideloadedProof,
-} from '../side-loaded/program.eg.js';
-import { FungibleToken, VKeyMerkleMap } from '../FungibleTokenStandard.js';
+import { FungibleToken } from '../FungibleTokenStandard.js';
 
 export class TokenEscrow extends SmartContract {
   @state(PublicKey)
@@ -57,25 +53,14 @@ export class TokenEscrow extends SmartContract {
   }
 
   @method
-  async deposit(
-    amount: UInt64,
-    proof: SideloadedProof,
-    vk: VerificationKey,
-    vKeyMap: VKeyMerkleMap
-  ) {
-    proof.verifyIf(vk, Bool(false));
+  async deposit(amount: UInt64) {
     const token = new FungibleToken(this.tokenAddress.getAndRequireEquals());
-    token.deriveTokenId().assertEquals(this.tokenId);
 
     const sender = this.sender.getUnconstrained();
     const senderUpdate = AccountUpdate.createSigned(sender);
     senderUpdate.body.useFullCommitment = Bool(true);
-    this.sender.getAndRequireSignature;
-    await token.transferCustom(
-      sender,
-      this.address,
-      amount,
-    );
+
+    await token.transferCustom(sender, this.address, amount);
 
     const total = this.total.getAndRequireEquals();
     this.total.set(total.add(amount));
@@ -84,17 +69,13 @@ export class TokenEscrow extends SmartContract {
   @method
   async withdraw(to: PublicKey, amount: UInt64) {
     const token = new FungibleToken(this.tokenAddress.getAndRequireEquals());
-    token.deriveTokenId().assertEquals(this.tokenId);
 
     const sender = this.sender.getUnconstrained();
     const senderUpdate = AccountUpdate.createSigned(sender);
     senderUpdate.body.useFullCommitment = Bool(true);
-    this.owner.getAndRequireEquals().assertEquals(sender);
 
-    let receiverUpdate = this.send({ to: sender, amount });
-    receiverUpdate.body.mayUseToken =
-      AccountUpdate.MayUseToken.InheritFromParent;
-    receiverUpdate.body.useFullCommitment = Bool(true);
+    this.owner.getAndRequireEquals().assertEquals(sender);
+    await token.transferCustom(this.address, to, amount);
 
     const total = this.total.getAndRequireEquals();
     total.assertGreaterThanOrEqual(amount, 'insufficient balance');
@@ -119,8 +100,7 @@ console.log(`
 Deployer Public Key: ${deployer.toBase58()}
 Owner Public Key: ${owner.toBase58()}
 Admin Public Key ${admin.publicKey.toBase58()}
-
-TokenContract Public Key: ${escrowContractKeyPair.publicKey.toBase58()}
+TokenContract Public Key: ${tokenContractKeyPair.publicKey.toBase58()}
 EscrowContract Public Key: ${escrowContractKeyPair.publicKey.toBase58()}
 `);
 
@@ -135,21 +115,11 @@ const burnParams = BurnParams.create(BurnConfig.default, {
 
 const tokenContract = new FungibleToken(tokenContractKeyPair.publicKey);
 const tokenId = tokenContract.deriveTokenId();
-const escrowContract = new TokenEscrow(
-  escrowContractKeyPair.publicKey,
-  tokenId
-);
+const escrowContract = new TokenEscrow(escrowContractKeyPair.publicKey);
 
 console.log('Compiling contracts...');
 await FungibleToken.compile();
 await TokenEscrow.compile();
-
-const vKeyMap = new VKeyMerkleMap();
-const dummyVkey = await VerificationKey.dummy();
-const dummyProof = await generateDummyDynamicProof(
-  tokenContract.deriveTokenId(),
-  deployer
-);
 
 console.log('Deploying Fungible Token Contract');
 const deployTx = await Mina.transaction(
@@ -196,24 +166,17 @@ const deployEscrowTx = await Mina.transaction(
     fee,
   },
   async () => {
+    // Deploy the escrow contract
     AccountUpdate.fundNewAccount(deployer, 1);
     await escrowContract.deploy({
       tokenAddress: tokenContractKeyPair.publicKey,
       owner,
     });
-
-    await tokenContract.approveAccountUpdateCustom(
-      escrowContract.self,
-    );
   }
 );
 
 await deployEscrowTx.prove();
-deployEscrowTx.sign([
-  deployer.key,
-  escrowContractKeyPair.privateKey,
-  tokenContractKeyPair.privateKey,
-]);
+deployEscrowTx.sign([deployer.key, escrowContractKeyPair.privateKey]);
 const deployEscrowTxResult = await deployEscrowTx.send().then((v) => v.wait());
 console.log(
   'Escrow Contract Deployment TX Result:',
@@ -226,10 +189,7 @@ const mintAlexaTx = await Mina.transaction(
   { sender: deployer, fee },
   async () => {
     AccountUpdate.fundNewAccount(deployer, 1);
-    await tokenContract.mint(
-      alexa,
-      mintParams.maxAmount,
-    );
+    await tokenContract.mint(alexa, mintParams.maxAmount);
   }
 );
 await mintAlexaTx.prove();
@@ -243,10 +203,7 @@ const mintBillyTx = await Mina.transaction(
   { sender: deployer, fee },
   async () => {
     AccountUpdate.fundNewAccount(deployer, 1);
-    await tokenContract.mint(
-      billy,
-      mintParams.maxAmount,
-    );
+    await tokenContract.mint(billy, mintParams.maxAmount);
   }
 );
 await mintBillyTx.prove();
@@ -262,15 +219,9 @@ const depositTx1 = await Mina.transaction(
     fee,
   },
   async () => {
-    await escrowContract.deposit(
-      new UInt64(100),
-      dummyProof,
-      dummyVkey,
-      vKeyMap
-    );
-    await tokenContract.approveAccountUpdateCustom(
-      escrowContract.self,
-    );
+    // Fund the escrow token account creation
+    AccountUpdate.fundNewAccount(alexa, 1);
+    await escrowContract.deposit(new UInt64(100));
   }
 );
 await depositTx1.prove();
@@ -292,15 +243,7 @@ const depositTx2 = await Mina.transaction(
     fee,
   },
   async () => {
-    await escrowContract.deposit(
-      new UInt64(50),
-      dummyProof,
-      dummyVkey,
-      vKeyMap
-    );
-    await tokenContract.approveAccountUpdateCustom(
-      escrowContract.self,
-    );
+    await escrowContract.deposit(new UInt64(50));
   }
 );
 await depositTx2.prove();
@@ -327,13 +270,10 @@ const withdrawTx = await Mina.transaction(
   async () => {
     AccountUpdate.fundNewAccount(owner, 1);
     await escrowContract.withdraw(jackie, new UInt64(25));
-    await tokenContract.approveAccountUpdateCustom(
-      escrowContract.self,
-    );
   }
 );
 await withdrawTx.prove();
-withdrawTx.sign([owner.key]);
+withdrawTx.sign([owner.key, escrowContractKeyPair.privateKey]);
 const withdrawTxResult = await withdrawTx.send().then((v) => v.wait());
 console.log('Withdraw tx result:', withdrawTxResult.toPretty());
 equal(withdrawTxResult.status, 'included');
@@ -356,12 +296,12 @@ const directWithdrawTx = await Mina.transaction(
     await tokenContract.transferCustom(
       escrowContractKeyPair.publicKey,
       jackie,
-      new UInt64(10),
+      new UInt64(10)
     );
   }
 );
 await directWithdrawTx.prove();
-directWithdrawTx.sign([jackie.key, escrowContractKeyPair.privateKey]);
+directWithdrawTx.sign([jackie.key]);
 const directWithdrawTxResult = await directWithdrawTx.safeSend();
 console.log('Direct Withdraw tx status:', directWithdrawTxResult.status);
 equal(directWithdrawTxResult.status, 'rejected');
