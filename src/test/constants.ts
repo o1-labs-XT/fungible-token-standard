@@ -46,13 +46,25 @@ export const ALL_PARAMS_PROPERTIES = Object.values(
  * These include framework errors, proof system errors, and test-specific scenarios
  */
 export const TEST_ERROR_MESSAGES = {
+  // Signature and authorization errors
   INVALID_SIGNATURE_FEE_PAYER:
     'Check signature: Invalid signature on fee payer for key',
   INVALID_SIGNATURE_ACCOUNT_UPDATE:
     'Check signature: Invalid signature on account_update 2',
-  CONSTRAINT_UNSATISFIED: 'Constraint unsatisfied (unreduced)',
-  PAUSED_METHOD: 'The `approveCustom` method is paused!',
-  NO_ADMIN_KEY: 'Unable to fetch admin contract key',
   NO_AUTHORIZATION_PROVIDED:
     'the required authorization was not provided or is invalid',
+  
+  // Constraint and proof system errors
+  CONSTRAINT_UNSATISFIED: 'Constraint unsatisfied (unreduced)',
+  
+  // Permission and state errors
+  CANNOT_UPDATE_PERMISSIONS_IMPOSSIBLE:
+    "Cannot update field 'permissions' because permission for this field is 'Impossible'",
+  PAUSED_METHOD: 'The `approveCustom` method is paused!',
+  
+  // Admin and key management errors
+  NO_ADMIN_KEY: 'Unable to fetch admin contract key',
+  
+  // Account nonce mismatch (specific test scenario)
+  MINA_ACCOUNT_NONCE_MISMATCH: 'Mismatch in MINA account nonce!',
 } as const;

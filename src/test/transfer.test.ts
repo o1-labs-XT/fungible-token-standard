@@ -35,9 +35,9 @@ import {
 } from '../side-loaded/program.eg.js';
 import { TEST_ERROR_MESSAGES } from './constants.js';
 
-const proofsEnabled = false;
+const proofsEnabled = true;
 
-describe('New Token Standard Transfer Tests', () => {
+describe('Fungible Token - Transfer Tests', () => {
   let tokenAdmin: Mina.TestPublicKey, tokenA: Mina.TestPublicKey;
 
   let fee: number,
@@ -231,8 +231,8 @@ describe('New Token Standard Transfer Tests', () => {
     }
   }
 
-  describe('Deploy & initialize', () => {
-    it('should deploy tokenA contract', async () => {
+  describe('Contract Deployment and Initialization', () => {
+    it('should deploy token contract successfully', async () => {
       const tx = await Mina.transaction({ sender: deployer, fee }, async () => {
         AccountUpdate.fundNewAccount(deployer);
 
@@ -248,7 +248,7 @@ describe('New Token Standard Transfer Tests', () => {
       await tx.send();
     });
 
-    it('should initialize tokenA contract', async () => {
+    it('should initialize token contract successfully', async () => {
       const tx = await Mina.transaction({ sender: deployer, fee }, async () => {
         AccountUpdate.fundNewAccount(deployer);
         await tokenContract.initialize(
@@ -294,13 +294,13 @@ describe('New Token Standard Transfer Tests', () => {
   });
 
   // SLV = Side-Loaded Verification
-  describe('Transfer: SLV disabled', () => {
+  describe('Transfer Operations - Sideload Disabled', () => {
     it('should do a transfer from user2 to user3', async () => {
       const transferAmount = UInt64.from(100);
       await testTransferTx(user2, user3, transferAmount, [user2.key]);
     });
 
-    it('should do a transfer from user2 to user3 with transferSideloadDisabled', async () => {
+    it('should do a transfer from user2 to user3 using sideload-disabled method', async () => {
       const transferAmount = UInt64.from(100);
       await testTransferSideloadDisabledTx(user2, user3, transferAmount, [
         user2.key,
@@ -320,10 +320,9 @@ describe('New Token Standard Transfer Tests', () => {
       );
     });
 
-    it('should reject a transaction not signed by the token holder with transferSideloadDisabled', async () => {
+    it('should reject a transaction not signed by the token holder using sideload-disabled method', async () => {
       const transferAmount = UInt64.from(100);
-      const expectedErrorMessage =
-        'Check signature: Invalid signature on fee payer for key';
+      const expectedErrorMessage = TEST_ERROR_MESSAGES.INVALID_SIGNATURE_FEE_PAYER;
       await testTransferSideloadDisabledTx(
         user1,
         user3,
@@ -333,7 +332,7 @@ describe('New Token Standard Transfer Tests', () => {
       );
     });
 
-    it("Should prevent transfers from account that's tracking circulation", async () => {
+    it('should prevent transfers from account that\'s tracking circulation', async () => {
       const transferAmount = UInt64.from(100);
       const expectedErrorMessage =
         FungibleTokenErrors.noTransferFromCirculation;
@@ -346,7 +345,7 @@ describe('New Token Standard Transfer Tests', () => {
       );
     });
 
-    it("Should prevent transfers from account that's tracking circulation with transferSideloadDisabled", async () => {
+    it('should prevent transfers from account that\'s tracking circulation using sideload-disabled method', async () => {
       const transferAmount = UInt64.from(100);
       const expectedErrorMessage =
         FungibleTokenErrors.noTransferFromCirculation;
@@ -359,7 +358,7 @@ describe('New Token Standard Transfer Tests', () => {
       );
     });
 
-    it("Should prevent transfers to account that's tracking circulation", async () => {
+    it('should prevent transfers to account that\'s tracking circulation', async () => {
       const transferAmount = UInt64.from(100);
       const expectedErrorMessage =
         FungibleTokenErrors.noTransferFromCirculation;
@@ -372,7 +371,7 @@ describe('New Token Standard Transfer Tests', () => {
       );
     });
 
-    it("Should prevent transfers to account that's tracking circulation with transferSideloadDisabled", async () => {
+    it('should prevent transfers to account that\'s tracking circulation using sideload-disabled method', async () => {
       const transferAmount = UInt64.from(100);
       const expectedErrorMessage =
         FungibleTokenErrors.noTransferFromCirculation;
@@ -386,8 +385,8 @@ describe('New Token Standard Transfer Tests', () => {
     });
   });
 
-  describe('Update Transfer Dynamic Proof Config', () => {
-    it('should reject transferDynamicProofConfig update when unauthorized by the admin', async () => {
+  describe('Transfer Dynamic Proof Config Updates', () => {
+    it('should reject transferDynamicProofConfig update when unauthorized by admin', async () => {
       try {
         let transferDynamicProofConfig = TransferDynamicProofConfig.default;
         transferDynamicProofConfig.shouldVerify = Bool(true);
@@ -407,13 +406,12 @@ describe('New Token Standard Transfer Tests', () => {
           .send()
           .wait();
       } catch (error: unknown) {
-        const expectedErrorMessage =
-          'the required authorization was not provided or is invalid';
+        const expectedErrorMessage = TEST_ERROR_MESSAGES.NO_AUTHORIZATION_PROVIDED;
         expect((error as Error).message).toContain(expectedErrorMessage);
       }
     });
 
-    it('update transfer dynamic proof config: enable side-loaded verification', async () => {
+    it('should update transfer dynamic proof config: enable side-loaded verification', async () => {
       let transferDynamicProofConfig = TransferDynamicProofConfig.default;
       transferDynamicProofConfig.shouldVerify = Bool(true);
 
@@ -434,10 +432,9 @@ describe('New Token Standard Transfer Tests', () => {
     });
   });
 
-  describe('Update Side-loaded vKey Hash', () => {
-    it('should reject updating side-loaded vKey hash: unauthorized by the admin', async () => {
-      const expectedErrorMessage =
-        'the required authorization was not provided or is invalid.';
+  describe('Side-loaded Verification Key Updates', () => {
+    it('should reject updating sideloaded verification key hash: unauthorized by admin', async () => {
+      const expectedErrorMessage = TEST_ERROR_MESSAGES.NO_AUTHORIZATION_PROVIDED;
       await updateSLVkeyHashTx(
         user1,
         programVkey,
@@ -448,7 +445,7 @@ describe('New Token Standard Transfer Tests', () => {
       );
     });
 
-    it('should reject updating side-loaded vKey hash: invalid operationKey', async () => {
+    it('should reject updating sideloaded verification key hash: invalid operationKey', async () => {
       const expectedErrorMessage = FungibleTokenErrors.invalidOperationKey;
       await updateSLVkeyHashTx(
         user1,
@@ -460,7 +457,7 @@ describe('New Token Standard Transfer Tests', () => {
       );
     });
 
-    it('should reject updating side-loaded vKey hash: non-compliant vKeyMap', async () => {
+    it('should reject updating sideloaded verification key hash: non-compliant vKeyMap', async () => {
       let tamperedVKeyMap = vKeyMap.clone();
       tamperedVKeyMap.insert(13n, Field.random());
 
@@ -490,7 +487,7 @@ describe('New Token Standard Transfer Tests', () => {
       );
     });
 
-    it('should update the side-loaded vKey hash for transfers', async () => {
+    it('should update the sideloaded verification key hash for transfers', async () => {
       await updateSLVkeyHashTx(
         user1,
         programVkey,
@@ -503,8 +500,8 @@ describe('New Token Standard Transfer Tests', () => {
     });
   });
 
-  describe('Transfer: SLV enabled', () => {
-    it('should reject transfer given a non-compliant vKeyMap', async () => {
+  describe('Side-loaded Transfer Operations', () => {
+    it('should reject transfer with non-compliant vKeyMap', async () => {
       let tamperedVKeyMap = vKeyMap.clone();
       tamperedVKeyMap.insert(6n, Field.random());
 
@@ -535,7 +532,7 @@ describe('New Token Standard Transfer Tests', () => {
       );
     });
 
-    it('should reject transfer given a non-compliant vKey hash', async () => {
+    it('should reject transfer with non-compliant vKey hash', async () => {
       const expectedErrorMessage = FungibleTokenErrors.invalidSideLoadedVKey;
 
       await testTransferSLTx(
@@ -552,7 +549,7 @@ describe('New Token Standard Transfer Tests', () => {
 
     //! only passes when `proofsEnabled=true`
     (!proofsEnabled ? test.skip : it)(
-      'should reject transfer given an invalid proof',
+      'should reject transfer with invalid proof',
       async () => {
         await program2.compile();
         const transferAmount = UInt64.from(150);
@@ -575,7 +572,7 @@ describe('New Token Standard Transfer Tests', () => {
       }
     );
 
-    it('should transfer given a valid proof', async () => {
+    it('should transfer with valid proof', async () => {
       const dynamicProof = await generateDynamicProof(
         tokenContract.deriveTokenId(),
         user2
@@ -613,7 +610,7 @@ describe('New Token Standard Transfer Tests', () => {
       );
     });
 
-    it('should reject transfer given an invalid proof requireTokenIdMatch precondition', async () => {
+    it('should reject transfer with invalid proof requireTokenIdMatch precondition', async () => {
       const dynamicProof = await generateDynamicProof(Field(1), user1);
 
       const transferAmount = UInt64.from(150);
@@ -630,7 +627,7 @@ describe('New Token Standard Transfer Tests', () => {
       );
     });
 
-    it('should reject transfer given an invalid proof requireMinaBalanceMatch precondition', async () => {
+    it('should reject transfer with invalid proof requireMinaBalanceMatch precondition', async () => {
       const dynamicProof = await generateDynamicProof(
         tokenContract.deriveTokenId(),
         user1
@@ -663,7 +660,7 @@ describe('New Token Standard Transfer Tests', () => {
       );
     });
 
-    it('should reject transfer given an invalid proof requireCustomTokenBalanceMatch precondition', async () => {
+    it('should reject transfer with invalid proof requireCustomTokenBalanceMatch precondition', async () => {
       const dynamicProof = await generateDynamicProof(
         tokenContract.deriveTokenId(),
         user2
@@ -701,7 +698,7 @@ describe('New Token Standard Transfer Tests', () => {
       );
     });
 
-    it('should reject transfer given an invalid proof requireMinaNonceMatch precondition', async () => {
+    it('should reject transfer with invalid proof requireMinaNonceMatch precondition', async () => {
       const dynamicProof = await generateDynamicProof(
         tokenContract.deriveTokenId(),
         user1

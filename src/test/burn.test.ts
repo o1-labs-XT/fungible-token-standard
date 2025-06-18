@@ -45,9 +45,9 @@ import {
   TEST_ERROR_MESSAGES,
 } from './constants.js';
 
-const proofsEnabled = false;
+const proofsEnabled = true;
 
-describe('New Token Standard Burn Tests', () => {
+describe('Fungible Token - Burn Tests', () => {
   let tokenAdmin: Mina.TestPublicKey, tokenA: Mina.TestPublicKey;
 
   let fee: number,
@@ -397,8 +397,8 @@ describe('New Token Standard Burn Tests', () => {
     }
   }
 
-  describe('Deploy & initialize', () => {
-    it('should deploy tokenA contract', async () => {
+  describe('Contract Deployment and Initialization', () => {
+    it('should deploy token contract successfully', async () => {
       const tx = await Mina.transaction({ sender: deployer, fee }, async () => {
         AccountUpdate.fundNewAccount(deployer);
 
@@ -414,7 +414,7 @@ describe('New Token Standard Burn Tests', () => {
       await tx.send();
     });
 
-    it('should initialize tokenA contract', async () => {
+    it('should initialize token contract successfully', async () => {
       const tx = await Mina.transaction({ sender: deployer, fee }, async () => {
         AccountUpdate.fundNewAccount(deployer);
         await tokenContract.initialize(
@@ -494,12 +494,12 @@ describe('New Token Standard Burn Tests', () => {
     });
   });
 
-  describe('Burn Config: Default: Unauthorized/Ranged', () => {
+  describe('Burn Operations - Default Config (Unauthorized/Ranged)', () => {
     it('should allow burning without authorization', async () => {
       await testBurnTx(user2, UInt64.from(100), [user2.key], undefined, 0);
     });
 
-    it('should allow burning without authorization with burnSideloadDisabled', async () => {
+    it('should allow burning without authorization using sideload-disabled method', async () => {
       await testBurnSideloadDisabledTx(
         user2,
         UInt64.from(100),
@@ -509,11 +509,11 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should burn an amount within the valid range: user', async () => {
+    it('should burn amount within valid range: user', async () => {
       await testBurnTx(user1, UInt64.from(50), [user1.key], undefined, 0);
     });
 
-    it('should burn an amount within the valid range with burnSideloadDisabled', async () => {
+    it('should burn amount within valid range using sideload-disabled method', async () => {
       await testBurnSideloadDisabledTx(
         user1,
         UInt64.from(50),
@@ -523,7 +523,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject burning an amount outside the valid range', async () => {
+    it('should reject burning amount outside valid range', async () => {
       await testBurnTx(
         user1,
         UInt64.from(700),
@@ -532,7 +532,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject burning an amount outside the valid range with burnSideloadDisabled', async () => {
+    it('should reject burning amount outside valid range using sideload-disabled method', async () => {
       await testBurnSideloadDisabledTx(
         user1,
         UInt64.from(700),
@@ -541,7 +541,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject burning an amount outside the valid range with burnSideloadDisabled', async () => {
+    it('should reject burning amount outside valid range using sideload-disabled method', async () => {
       await testBurnSideloadDisabledTx(
         user1,
         UInt64.from(700),
@@ -550,7 +550,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject burning from the circulating supply account', async () => {
+    it('should reject burning from circulating supply account', async () => {
       const expectedErrorMessage =
         FungibleTokenErrors.noTransferFromCirculation;
       try {
@@ -573,7 +573,7 @@ describe('New Token Standard Burn Tests', () => {
       }
     });
 
-    it('should reject burning from the circulating supply account with burnSideloadDisabled', async () => {
+    it('should reject burning from circulating supply account using sideload-disabled method', async () => {
       await testBurnSideloadDisabledTx(
         tokenContract.address,
         UInt64.from(100),
@@ -583,8 +583,8 @@ describe('New Token Standard Burn Tests', () => {
     });
   });
 
-  describe('Update Burn Config: Unauthorized/Fixed', () => {
-    it('should reject burnConfig update when both range and fixed burn are enabled', async () => {
+  describe('Burn Config Updates - Unauthorized/Fixed Mode', () => {
+    it('should reject burn config update when both range and fixed burn are enabled', async () => {
       const burnConfig = new BurnConfig({
         unauthorized: Bool(true),
         fixedAmount: Bool(true),
@@ -601,7 +601,7 @@ describe('New Token Standard Burn Tests', () => {
     });
 
     //! should test authorized burns
-    it('should reject burnConfig update when unauthorized by the admin', async () => {
+    it('should reject burn config update when unauthorized by admin', async () => {
       const burnConfig = new BurnConfig({
         unauthorized: Bool(true),
         fixedAmount: Bool(true),
@@ -609,7 +609,7 @@ describe('New Token Standard Burn Tests', () => {
       });
 
       const expectedErrorMessage =
-        'the required authorization was not provided or is invalid.';
+        TEST_ERROR_MESSAGES.NO_AUTHORIZATION_PROVIDED;
       await updateBurnConfigTx(
         user2,
         burnConfig,
@@ -676,7 +676,7 @@ describe('New Token Standard Burn Tests', () => {
       expect(burnConfigAfter.rangedAmount).toEqual(newFixedAmountValue.not());
     });
 
-    it('should reject burn fixed amount config update via field-specific function when unauthorized by the admin', async () => {
+    it('should reject burn fixed amount config update via field-specific function when unauthorized by admin', async () => {
       const packedConfigsBefore = tokenContract.packedAmountConfigs.get();
       const burnConfigBefore = BurnConfig.unpack(packedConfigsBefore);
       const originalFixedAmount = burnConfigBefore.fixedAmount;
@@ -685,7 +685,7 @@ describe('New Token Standard Burn Tests', () => {
 
       const attemptFixedAmountValue = Bool(true);
       const expectedErrorMessage =
-        'the required authorization was not provided or is invalid.';
+        TEST_ERROR_MESSAGES.NO_AUTHORIZATION_PROVIDED;
 
       await updateBurnConfigPropertyTx(
         user2,
@@ -724,7 +724,7 @@ describe('New Token Standard Burn Tests', () => {
       expect(burnConfigAfter.unauthorized).toEqual(originalUnauthorized);
     });
 
-    it('should reject rangedAmount config update via field-specific function when unauthorized by the admin', async () => {
+    it('should reject rangedAmount config update via field-specific function when unauthorized by admin', async () => {
       const packedConfigsBefore = tokenContract.packedAmountConfigs.get();
       const burnConfigBefore = BurnConfig.unpack(packedConfigsBefore);
       const originalFixedAmount = burnConfigBefore.fixedAmount;
@@ -733,7 +733,7 @@ describe('New Token Standard Burn Tests', () => {
 
       const attemptRangedAmountValue = Bool(true);
       const expectedErrorMessage =
-        'the required authorization was not provided or is invalid.';
+        TEST_ERROR_MESSAGES.NO_AUTHORIZATION_PROVIDED;
 
       await updateBurnConfigPropertyTx(
         user2,
@@ -773,7 +773,7 @@ describe('New Token Standard Burn Tests', () => {
       expect(burnConfigAfter.rangedAmount).toEqual(originalRangedAmount);
     });
 
-    it('should reject unauthorized config update via field-specific function when unauthorized by the admin', async () => {
+    it('should reject unauthorized config update via field-specific function when unauthorized by admin', async () => {
       const packedConfigsBefore = tokenContract.packedAmountConfigs.get();
       const burnConfigBefore = BurnConfig.unpack(packedConfigsBefore);
       const originalFixedAmount = burnConfigBefore.fixedAmount;
@@ -782,7 +782,7 @@ describe('New Token Standard Burn Tests', () => {
 
       const attemptUnauthorizedValue = Bool(false);
       const expectedErrorMessage =
-        'the required authorization was not provided or is invalid.';
+        TEST_ERROR_MESSAGES.NO_AUTHORIZATION_PROVIDED;
 
       await updateBurnConfigPropertyTx(
         user2,
@@ -801,8 +801,8 @@ describe('New Token Standard Burn Tests', () => {
     });
   });
 
-  describe('Update Burn Params', () => {
-    it('should reject burnParams update given an invalid range', async () => {
+  describe('Burn Parameter Updates', () => {
+    it('should reject burn params update with invalid range', async () => {
       burnParams = new BurnParams({
         fixedAmount: UInt64.from(300),
         minAmount: UInt64.from(100),
@@ -818,7 +818,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject burnParams update when unauthorized by the admin', async () => {
+    it('should reject burn params update when unauthorized by admin', async () => {
       burnParams = new BurnParams({
         fixedAmount: UInt64.from(100),
         minAmount: UInt64.from(50),
@@ -826,7 +826,7 @@ describe('New Token Standard Burn Tests', () => {
       });
 
       const expectedErrorMessage =
-        'the required authorization was not provided or is invalid.';
+        TEST_ERROR_MESSAGES.NO_AUTHORIZATION_PROVIDED;
       await updateBurnParamsTx(
         user1,
         burnParams,
@@ -888,7 +888,7 @@ describe('New Token Standard Burn Tests', () => {
       expect(paramsAfterUpdate.maxAmount).toEqual(originalMaxAmount);
     });
 
-    it('should reject burn fixed amount update via field-specific function when unauthorized by the admin', async () => {
+    it('should reject burn fixed amount update via field-specific function when unauthorized by admin', async () => {
       const paramsBeforeAttempt = BurnParams.unpack(
         tokenContract.packedBurnParams.get()
       );
@@ -898,7 +898,7 @@ describe('New Token Standard Burn Tests', () => {
 
       const newFixedAmountAttempt = UInt64.from(750);
       const expectedErrorMessage =
-        'the required authorization was not provided or is invalid.';
+        TEST_ERROR_MESSAGES.NO_AUTHORIZATION_PROVIDED;
 
       await updateBurnParamsPropertyTx(
         user1,
@@ -941,7 +941,7 @@ describe('New Token Standard Burn Tests', () => {
       expect(paramsAfterUpdate.maxAmount).toEqual(originalMaxAmount);
     });
 
-    it('should reject burn min amount update via field-specific function when unauthorized by the admin', async () => {
+    it('should reject burn min amount update via field-specific function when unauthorized by admin', async () => {
       const paramsBeforeAttempt = BurnParams.unpack(
         tokenContract.packedBurnParams.get()
       );
@@ -951,7 +951,7 @@ describe('New Token Standard Burn Tests', () => {
 
       const newMinAmountAttempt = UInt64.from(150);
       const expectedErrorMessage =
-        'the required authorization was not provided or is invalid.';
+        TEST_ERROR_MESSAGES.NO_AUTHORIZATION_PROVIDED;
 
       await updateBurnParamsPropertyTx(
         user1,
@@ -1019,7 +1019,7 @@ describe('New Token Standard Burn Tests', () => {
       expect(paramsAfterUpdate.minAmount).toEqual(originalMinAmount);
     });
 
-    it('should reject burn max amount update via field-specific function when unauthorized by the admin', async () => {
+    it('should reject burn max amount update via field-specific function when unauthorized by admin', async () => {
       const paramsBeforeAttempt = BurnParams.unpack(
         tokenContract.packedBurnParams.get()
       );
@@ -1029,7 +1029,7 @@ describe('New Token Standard Burn Tests', () => {
 
       const newMaxAmountAttempt = UInt64.from(1300);
       const expectedErrorMessage =
-        'the required authorization was not provided or is invalid.';
+        TEST_ERROR_MESSAGES.NO_AUTHORIZATION_PROVIDED;
 
       await updateBurnParamsPropertyTx(
         user1,
@@ -1076,8 +1076,8 @@ describe('New Token Standard Burn Tests', () => {
   });
 
   // burn fixed amount is set to 150
-  describe('Burn Config: Unauthorized/Fixed', () => {
-    it('should reject burning an amount different from the fixed value', async () => {
+  describe('Burn Operations - Unauthorized/Fixed Mode', () => {
+    it('should reject burning amount different from fixed value', async () => {
       await testBurnTx(
         user1,
         UInt64.from(50),
@@ -1087,7 +1087,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject burning an amount different from the fixed value with burnSideloadDisabled', async () => {
+    it('should reject burning amount different from fixed value using sideload-disabled method', async () => {
       await testBurnSideloadDisabledTx(
         user1,
         UInt64.from(50),
@@ -1097,7 +1097,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject burning an amount different from the fixed value with burnSideloadDisabled', async () => {
+    it('should reject burning amount different from fixed value using sideload-disabled method', async () => {
       await testBurnSideloadDisabledTx(
         user1,
         UInt64.from(50),
@@ -1107,11 +1107,11 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should only burn an amount equal to the fixed value', async () => {
+    it('should only burn amount equal to fixed value', async () => {
       await testBurnTx(user2, UInt64.from(150), [user2.key], undefined, 0);
     });
 
-    it('should only burn an amount equal to the fixed value with burnSideloadDisabled', async () => {
+    it('should only burn amount equal to fixed value using sideload-disabled method', async () => {
       await testBurnSideloadDisabledTx(
         user2,
         UInt64.from(150),
@@ -1122,7 +1122,7 @@ describe('New Token Standard Burn Tests', () => {
     });
   });
 
-  describe('Burn Config: Authorized/Fixed', () => {
+  describe('Burn Operations - Authorized/Fixed Mode', () => {
     it('update burn config to enforce admin authorization', async () => {
       const burnConfig = new BurnConfig({
         unauthorized: Bool(false),
@@ -1138,11 +1138,11 @@ describe('New Token Standard Burn Tests', () => {
         user1,
         UInt64.from(150),
         [user1.key],
-        'the required authorization was not provided or is invalid.'
+        TEST_ERROR_MESSAGES.NO_AUTHORIZATION_PROVIDED
       );
     });
 
-    it('update burn config again to disable admin authorization', async () => {
+    it('should update burn config again to disable admin authorization', async () => {
       const burnConfig = new BurnConfig({
         unauthorized: Bool(true),
         fixedAmount: Bool(true),
@@ -1153,13 +1153,13 @@ describe('New Token Standard Burn Tests', () => {
     });
   });
 
-  describe('Update Burn Dynamic Proof Config', () => {
-    it('should reject burnDynamicProofConfig update when unauthorized by the admin', async () => {
+  describe('Dynamic Proof Config Updates', () => {
+    it('should reject burnDynamicProofConfig update when unauthorized by admin', async () => {
       let burnDynamicProofConfig = BurnDynamicProofConfig.default;
       burnDynamicProofConfig.shouldVerify = Bool(true);
 
       const expectedErrorMessage =
-        'the required authorization was not provided or is invalid';
+        TEST_ERROR_MESSAGES.NO_AUTHORIZATION_PROVIDED;
       await updateBurnDynamicProofConfigTx(
         user2,
         burnDynamicProofConfig,
@@ -1179,10 +1179,10 @@ describe('New Token Standard Burn Tests', () => {
     });
   });
 
-  describe('Update Side-loaded vKey Hash', () => {
-    it('should reject updating side-loaded vKey hash: unauthorized by the admin', async () => {
+  describe('Side-loaded Verification Key Updates', () => {
+    it('should reject updating sideloaded verification key hash: unauthorized by admin', async () => {
       const expectedErrorMessage =
-        'the required authorization was not provided or is invalid.';
+        TEST_ERROR_MESSAGES.NO_AUTHORIZATION_PROVIDED;
       await updateSLVkeyHashTx(
         user1,
         programVkey,
@@ -1193,7 +1193,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject updating side-loaded vKey hash: invalid operationKey', async () => {
+    it('should reject updating sideloaded verification key hash: invalid operationKey', async () => {
       const expectedErrorMessage = FungibleTokenErrors.invalidOperationKey;
       await updateSLVkeyHashTx(
         user1,
@@ -1205,7 +1205,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject updating side-loaded vKey hash: non-compliant vKeyMap', async () => {
+    it('should reject updating sideloaded verification key hash: non-compliant vKeyMap', async () => {
       let tamperedVKeyMap = vKeyMap.clone();
       tamperedVKeyMap.insert(11n, Field.random());
 
@@ -1234,7 +1234,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should update the side-loaded vKey hash for burns', async () => {
+    it('should update the sideloaded verification key hash for burns', async () => {
       await updateSLVkeyHashTx(
         user1,
         programVkey,
@@ -1248,8 +1248,8 @@ describe('New Token Standard Burn Tests', () => {
   });
 
   // SLV = Side-Loaded Verification (enabled)
-  describe('Burn Config: Unauthorized/Fixed/SLV Burn', () => {
-    it('should reject burn given a non-compliant vKeyMap', async () => {
+  describe('Side-loaded Burn Operations - Unauthorized/Fixed Mode', () => {
+    it('should reject burn with non-compliant vKeyMap', async () => {
       let tamperedVKeyMap = vKeyMap.clone();
       tamperedVKeyMap.insert(6n, Field.random());
 
@@ -1266,7 +1266,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject burn given a non-compliant vKey hash', async () => {
+    it('should reject burn with non-compliant vKey hash', async () => {
       const expectedErrorMessage = FungibleTokenErrors.invalidSideLoadedVKey;
 
       await testBurnSLTx(
@@ -1282,7 +1282,7 @@ describe('New Token Standard Burn Tests', () => {
 
     //! only passes when `proofsEnabled=true`
     (!proofsEnabled ? test.skip : it)(
-      'should reject burn given an invalid proof',
+      'should reject burn with invalid proof',
       async () => {
         await program2.compile();
         const burnAmount = UInt64.from(150);
@@ -1304,7 +1304,7 @@ describe('New Token Standard Burn Tests', () => {
       }
     );
 
-    it('should burn given a valid proof', async () => {
+    it('should burn with valid proof', async () => {
       const dynamicProof = await generateDynamicProof(
         tokenContract.deriveTokenId(),
         user2
@@ -1321,7 +1321,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject burn with burnSideloadDisabled', async () => {
+    it('should reject burn using sideload-disabled method', async () => {
       await testBurnSideloadDisabledTx(
         user1,
         UInt64.from(150),
@@ -1349,7 +1349,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject burn given an invalid proof requireTokenIdMatch precondition', async () => {
+    it('should reject burn with invalid proof requireTokenIdMatch precondition', async () => {
       const dynamicProof = await generateDynamicProof(Field(1), user1);
 
       const burnAmount = UInt64.from(150);
@@ -1365,7 +1365,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject burn given an invalid proof requireMinaBalanceMatch precondition', async () => {
+    it('should reject burn with invalid proof requireMinaBalanceMatch precondition', async () => {
       const dynamicProof = await generateDynamicProof(
         tokenContract.deriveTokenId(),
         user1
@@ -1397,7 +1397,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject burn given an invalid proof requireCustomTokenBalanceMatch precondition', async () => {
+    it('should reject burn with invalid proof requireCustomTokenBalanceMatch precondition', async () => {
       const dynamicProof = await generateDynamicProof(
         tokenContract.deriveTokenId(),
         user2
@@ -1434,7 +1434,7 @@ describe('New Token Standard Burn Tests', () => {
       );
     });
 
-    it('should reject burn given an invalid proof requireMinaNonceMatch precondition', async () => {
+    it('should reject burn with invalid proof requireMinaNonceMatch precondition', async () => {
       const dynamicProof = await generateDynamicProof(
         tokenContract.deriveTokenId(),
         user1
