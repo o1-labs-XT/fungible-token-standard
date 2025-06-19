@@ -35,13 +35,14 @@ import {
   EventTypes,
   ParameterTypes,
   FlagTypes,
+  MERKLE_HEIGHT,
+  MINA_TOKEN_ID,
 } from './configs.js';
 import { SideloadedProof } from './side-loaded/program.eg.js';
 
 const { IndexedMerkleMap } = Experimental;
 
-const height = 3;
-class VKeyMerkleMap extends IndexedMerkleMap(height) {}
+class VKeyMerkleMap extends IndexedMerkleMap(MERKLE_HEIGHT) {}
 
 export {
   FungibleTokenErrors,
@@ -1063,7 +1064,7 @@ class FungibleToken extends TokenContract {
     // Ensure the MINA account data uses native MINA.
     Provable.if(
       shouldVerify,
-      minaAccountData.tokenId.equals(1),
+      minaAccountData.tokenId.equals(MINA_TOKEN_ID),
       Bool(true)
     ).assertTrue(FungibleTokenErrors.incorrectMinaTokenId);
 

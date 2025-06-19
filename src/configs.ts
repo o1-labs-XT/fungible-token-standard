@@ -15,6 +15,8 @@ export {
   EventTypes,
   ParameterTypes,
   FlagTypes,
+  MERKLE_HEIGHT,
+  MINA_TOKEN_ID,
 };
 
 /**
@@ -34,6 +36,21 @@ const ConfigErrors = {
     'Invalid mint configuration: Missing or conflicting amount parameters',
   invalidBurnConfigData:
     'Invalid burn configuration: Missing or conflicting amount parameters',
+};
+
+/**
+ * Constants defining required sizes and counts for configurations
+ */
+const CONFIG_REQUIREMENTS = {
+  /**
+   * Number of dynamic proof configs in a complete set (mint, burn, transfer, updates)
+   */
+  DYNAMIC_PROOF_CONFIG_COUNT: 4,
+
+  /**
+   * Number of amount configs in a complete set (mint, burn)
+   */
+  AMOUNT_CONFIG_COUNT: 2,
 };
 
 /**
@@ -96,6 +113,44 @@ const FlagTypes = {
   Unauthorized: Field(3),
 };
 
+// The native MINA token ID is always 1
+const MINA_TOKEN_ID = 1 as const;
+
+/**
+ * Height of the Merkle tree used for verification key storage.
+ * Used to configure the IndexedMerkleMap for VKeyMerkleMap.
+ */
+const MERKLE_HEIGHT = 3;
+
+const BIT_SIZES = {
+  // Amount configs constants (MintConfig, BurnConfig)
+  AMOUNT_CONFIG: {
+    TOTAL_BITS: 6,
+    MINT: { START: 0, END: 3 },
+    BURN: { START: 3, END: 6 },
+  },
+
+  // Amount parameters constants (MintParams, BurnParams)
+  AMOUNT_PARAMS: {
+    TOTAL_BITS: 64 * 3,
+    FIXED_AMOUNT: { START: 0, END: 64 },
+    MIN_AMOUNT: { START: 64, END: 64 * 2 },
+    MAX_AMOUNT: { START: 64 * 2, END: 64 * 3 },
+  },
+
+  // Dynamic proof config constants
+  DYNAMIC_PROOF_CONFIG: {
+    TOTAL_BITS: 28,
+    BITS_PER_CONFIG: 7,
+    INDICES: {
+      MINT: 0,
+      BURN: 1,
+      TRANSFER: 2,
+      UPDATES: 3,
+    },
+  },
+} as const;
+
 /**
  * `AmountConfig` defines shared constraints for fixed and ranged value settings
  * used in minting and burning operations.
@@ -139,7 +194,7 @@ class AmountConfig extends Struct({
    * @returns A packed `Field` combining both configs.
    */
   static packConfigs(configs: [AmountConfig, AmountConfig]): Field {
-    if (configs.length !== 2)
+    if (configs.length !== CONFIG_REQUIREMENTS.AMOUNT_CONFIG_COUNT)
       throw new Error(ConfigErrors.invalidAmountConfigCount);
     return Field.fromBits([...configs[0].toBits(), ...configs[1].toBits()]);
   }
@@ -176,7 +231,12 @@ class MintConfig extends AmountConfig {
    * @returns A `MintConfig` instance constructed from the first 3 bits of the field.
    */
   static unpack(packedConfigs: Field) {
-    const serializedMintConfig = packedConfigs.toBits(6).slice(0, 3);
+    const serializedMintConfig = packedConfigs
+      .toBits(BIT_SIZES.AMOUNT_CONFIG.TOTAL_BITS)
+      .slice(
+        BIT_SIZES.AMOUNT_CONFIG.MINT.START,
+        BIT_SIZES.AMOUNT_CONFIG.MINT.END
+      );
     const [unauthorized, fixedAmount, rangedAmount] = serializedMintConfig;
 
     return new this({
@@ -196,12 +256,17 @@ class MintConfig extends AmountConfig {
    * @returns A new `Field` with updated mint config and preserved burn config.
    */
   updatePackedConfigs(packedConfigs: Field) {
-    const serializedConfigs = packedConfigs.toBits(6);
+    const serializedConfigs = packedConfigs.toBits(
+      BIT_SIZES.AMOUNT_CONFIG.TOTAL_BITS
+    );
     const serializedMintConfig = this.toBits();
 
     const updatedPackedConfigs = Field.fromBits([
       ...serializedMintConfig,
-      ...serializedConfigs.slice(3, 6),
+      ...serializedConfigs.slice(
+        BIT_SIZES.AMOUNT_CONFIG.BURN.START,
+        BIT_SIZES.AMOUNT_CONFIG.BURN.END
+      ),
     ]);
 
     return updatedPackedConfigs;
@@ -239,7 +304,12 @@ class BurnConfig extends AmountConfig {
    * @returns A `BurnConfig` instance constructed from bits 3–5.
    */
   static unpack(packedConfigs: Field) {
-    const serializedBurnConfig = packedConfigs.toBits(6).slice(3, 6);
+    const serializedBurnConfig = packedConfigs
+      .toBits(BIT_SIZES.AMOUNT_CONFIG.TOTAL_BITS)
+      .slice(
+        BIT_SIZES.AMOUNT_CONFIG.BURN.START,
+        BIT_SIZES.AMOUNT_CONFIG.BURN.END
+      );
     const [unauthorized, fixedAmount, rangedAmount] = serializedBurnConfig;
 
     return new this({
@@ -259,11 +329,16 @@ class BurnConfig extends AmountConfig {
    * @returns A new `Field` with updated burn config and preserved mint config.
    */
   updatePackedConfigs(packedConfigs: Field) {
-    const serializedConfigs = packedConfigs.toBits(6);
+    const serializedConfigs = packedConfigs.toBits(
+      BIT_SIZES.AMOUNT_CONFIG.TOTAL_BITS
+    );
     const serializedBurnConfig = this.toBits();
 
     const updatedPackedConfigs = Field.fromBits([
-      ...serializedConfigs.slice(0, 3),
+      ...serializedConfigs.slice(
+        BIT_SIZES.AMOUNT_CONFIG.MINT.START,
+        BIT_SIZES.AMOUNT_CONFIG.MINT.END
+      ),
       ...serializedBurnConfig,
     ]);
 
@@ -328,11 +403,26 @@ class AmountParams extends Struct({
    * @returns A new AmountParams instance with the unpacked fixed, minimum, and maximum amounts.
    */
   static unpack(packedParams: Field) {
-    const bits = packedParams.toBits(64 * 3);
+    const bits = packedParams.toBits(BIT_SIZES.AMOUNT_PARAMS.TOTAL_BITS);
     return new this({
-      fixedAmount: UInt64.fromBits(bits.slice(0, 64)),
-      minAmount: UInt64.fromBits(bits.slice(64, 64 * 2)),
-      maxAmount: UInt64.fromBits(bits.slice(64 * 2, 64 * 3)),
+      fixedAmount: UInt64.fromBits(
+        bits.slice(
+          BIT_SIZES.AMOUNT_PARAMS.FIXED_AMOUNT.START,
+          BIT_SIZES.AMOUNT_PARAMS.FIXED_AMOUNT.END
+        )
+      ),
+      minAmount: UInt64.fromBits(
+        bits.slice(
+          BIT_SIZES.AMOUNT_PARAMS.MIN_AMOUNT.START,
+          BIT_SIZES.AMOUNT_PARAMS.MIN_AMOUNT.END
+        )
+      ),
+      maxAmount: UInt64.fromBits(
+        bits.slice(
+          BIT_SIZES.AMOUNT_PARAMS.MAX_AMOUNT.START,
+          BIT_SIZES.AMOUNT_PARAMS.MAX_AMOUNT.END
+        )
+      ),
     });
   }
 
@@ -538,8 +628,10 @@ class DynamicProofConfig extends Struct({
    * @returns A DynamicProofConfig instance.
    */
   static unpack(packedConfigs: Field, configIndex: number) {
-    const start = configIndex * 7;
-    const bits = packedConfigs.toBits(28).slice(start, start + 7);
+    const start = configIndex * BIT_SIZES.DYNAMIC_PROOF_CONFIG.BITS_PER_CONFIG;
+    const bits = packedConfigs
+      .toBits(BIT_SIZES.DYNAMIC_PROOF_CONFIG.TOTAL_BITS)
+      .slice(start, start + BIT_SIZES.DYNAMIC_PROOF_CONFIG.BITS_PER_CONFIG);
 
     return new this({
       shouldVerify: bits[0],
@@ -559,12 +651,14 @@ class DynamicProofConfig extends Struct({
    * @returns Updated 24-bit packed Field.
    */
   updatePackedConfigs(packedConfigs: Field, configIndex: number): Field {
-    const bits = packedConfigs.toBits(28);
-    const start = configIndex * 7;
+    const bits = packedConfigs.toBits(
+      BIT_SIZES.DYNAMIC_PROOF_CONFIG.TOTAL_BITS
+    );
+    const start = configIndex * BIT_SIZES.DYNAMIC_PROOF_CONFIG.BITS_PER_CONFIG;
     const updatedBits = [
       ...bits.slice(0, start),
       ...this.toBits(),
-      ...bits.slice(start + 7),
+      ...bits.slice(start + BIT_SIZES.DYNAMIC_PROOF_CONFIG.BITS_PER_CONFIG),
     ];
 
     return Field.fromBits(updatedBits);
@@ -576,7 +670,7 @@ class DynamicProofConfig extends Struct({
    * @returns Packed 24-bit Field.
    */
   static packConfigs(configs: DynamicProofConfig[]): Field {
-    if (configs.length !== 4)
+    if (configs.length !== CONFIG_REQUIREMENTS.DYNAMIC_PROOF_CONFIG_COUNT)
       throw new Error(ConfigErrors.invalidDynamicProofConfigCount);
 
     const bits = configs.flatMap((config) => config.toBits());
